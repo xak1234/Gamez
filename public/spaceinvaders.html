@@ -6,7 +6,6 @@
     <title>Space Invaders</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
-        /* Basic Reset & Centering */
         body, html {
             width: 100%;
             height: 100%;
@@ -21,7 +20,6 @@
             font-family: 'Press Start 2P', cursive;
             overflow: hidden;
         }
-
         canvas {
             display: block;
             background-color: #000;
@@ -35,12 +33,10 @@
             max-height: 80vh;
             aspect-ratio: 4 / 3;
         }
-
         .game-controls {
             margin-top: 20px;
             text-align: center;
         }
-
         .game-controls button {
             background-color: #222;
             color: #0f0;
@@ -54,22 +50,18 @@
             box-shadow: 0 0 5px #0f0;
             transition: background-color 0.2s, box-shadow 0.2s;
         }
-
         .game-controls button:hover, .game-controls button:focus {
             background-color: #111;
             box-shadow: 0 0 10px #0f0, 0 0 5px #0f0 inset;
         }
-
         .game-controls button:active {
             transform: translateY(2px);
         }
-
         #scoreBoard, #livesBoard {
             font-size: 1.2rem;
             margin-bottom: 10px;
             color: #0f0;
         }
-
         #messageBox {
             position: absolute;
             top: 50%;
@@ -85,18 +77,15 @@
             box-shadow: 0 0 15px #0f0;
             display: none;
         }
-
         #messageBox h1 {
             font-size: 2rem;
             color: #0f0;
             margin-bottom: 15px;
         }
-
         #messageBox p {
             font-size: 1rem;
             margin-bottom: 20px;
         }
-
         #messageBox button {
             background-color: #0f0;
             color: #000;
@@ -108,12 +97,10 @@
             border-radius: 5px;
             transition: background-color 0.2s, transform 0.2s;
         }
-
         #messageBox button:hover {
             background-color: #3f3;
             transform: scale(1.05);
         }
-
         #touchControls {
             display: none;
             margin-top: 15px;
@@ -121,13 +108,11 @@
             max-width: 400px;
             justify-content: space-between;
         }
-
         #touchControls button {
             font-size: 1.5rem;
             padding: 15px 20px;
             width: 30%;
         }
-
         @media (max-width: 600px) {
             #touchControls {
                 display: flex;
@@ -152,28 +137,23 @@
 <body>
     <div id="scoreBoard">Score: 0</div>
     <div id="livesBoard">Lives: 3</div>
-
     <canvas id="gameCanvas"></canvas>
-
     <div id="messageBox">
         <h1 id="messageTitle">Space Invaders</h1>
         <p id="messageText">Press Start to play!</p>
         <button id="messageButton">Start Game</button>
     </div>
-
     <div id="touchControls">
         <button id="touchLeft">⬅️</button>
         <button id="touchFire">🔥</button>
         <button id="touchRight">➡️</button>
     </div>
-
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
         const scoreBoard = document.getElementById('scoreBoard');
         const livesBoard = document.getElementById('livesBoard');
-        const finalScoreDisplay = document.getElementById('finalScore');
         const messageBox = document.getElementById('messageBox');
         const messageTitle = document.getElementById('messageTitle');
         const messageText = document.getElementById('messageText');
@@ -581,7 +561,6 @@
 
         function gameOver() {
             gameState = 'over';
-            finalScoreDisplay.textContent = score;
             showMessage(
                 "Game Over",
                 `Your final score: <span id="finalScore">${score}</span>`,
@@ -595,7 +574,6 @@
 
         function gameWon() {
             gameState = 'over';
-            finalScoreDisplay.textContent = score;
             showMessage(
                 "You Win!",
                 `Congratulations! Your score: <span id="finalScore">${score}</span>`,
