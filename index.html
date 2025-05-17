@@ -82,7 +82,7 @@
 <body>
   <header>
     Gamez Arcade 🎮<br>
-    <span style="font-size:1rem; color:#adadad; font-weight:400;">Play all the classics, new-school style</span>
+    <span style="font-size:1rem; color:#adadad; font-weight:400;">Launch classics, flex your skills, and vibe out.</span>
   </header>
   <main>
     <section class="games-grid" id="gamesGrid">
@@ -90,33 +90,26 @@
     </section>
   </main>
   <script>
-    // Edit this array to add/remove your games!
+    // Drop your games here — easy to add new ones!
     const games = [
+      {
+        title: "Pacman 3",
+        icon: "🟡",
+        file: "pac3.html",
+        desc: "Classic maze runner, yellow and wild. Go munch."
+      },
+      {
+        title: "Space Invaders",
+        icon: "👾",
+        file: "spaceinvaders.html",
+        desc: "Blast the aliens. Retro shooter energy."
+      },
       {
         title: "Asteroids",
         icon: "🪐",
         file: "asteroids.html",
-        desc: "OG arcade vibes. Dodge & destroy the space rocks!"
-      },
-      {
-        title: "Snake",
-        icon: "🐍",
-        file: "snake.html",
-        desc: "How long can you survive? The nostalgia's real."
-      },
-      {
-        title: "Tetris",
-        icon: "🧩",
-        file: "tetris.html",
-        desc: "Stack ‘em, rack ‘em. The ultimate block party."
-      },
-      // Add more games below!
-      // {
-      //   title: "Game Name",
-      //   icon: "🎲",
-      //   file: "gamefile.html",
-      //   desc: "Short, punchy description"
-      // }
+        desc: "Dodge, shoot, and survive the space rocks."
+      }
     ];
 
     const grid = document.getElementById("gamesGrid");
