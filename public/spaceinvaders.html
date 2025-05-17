@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -711,10 +712,8 @@
 
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
-        showMessage("Space Invaders", "Press Space or Tap Fire to Start!", "Start Game", () => {
-            initGame();
-            requestAnimationFrame(gameLoop);
-        });
+        initGame(); // Initialize game elements
+        requestAnimationFrame(gameLoop); // Start the game loop immediately
     </script>
 </body>
 </html>
