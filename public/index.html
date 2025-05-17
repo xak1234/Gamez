@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Gamez Arcade 🎮</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #6be1ff;
+      --bg-dark: #181c25;
+      --glass: rgba(34,39,54,0.85);
+      --card-hover: #262a38;
+    }
+    body {
+      margin: 0;
+      font-family: 'Roboto', Arial, sans-serif;
+      background: linear-gradient(135deg, #090a0f 0%, #232840 100%);
+      min-height: 100vh;
+      color: #fff;
+      overflow-x: hidden;
+    }
+    header {
+      text-align: center;
+      padding: 2.5rem 1rem 1.5rem 1rem;
+      font-size: 2.4rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      background: transparent;
+      color: var(--accent);
+      text-shadow: 0 4px 32px #141c2e, 0 1px 0 #222;
+    }
+    .games-grid {
+      display: grid;
+      gap: 2.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      padding: 0 2rem 2.5rem 2rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .game-card {
+      background: var(--glass);
+      border-radius: 1.5rem;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.4);
+      transition: transform 0.18s, box-shadow 0.18s, background 0.18s;
+      padding: 2.5rem 1.2rem 1.6rem 1.2rem;
+      text-align: center;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      border: 1.5px solid #2d323f;
+    }
+    .game-card:hover {
+      background: var(--card-hover);
+      box-shadow: 0 8px 40px var(--accent), 0 4px 16px #101321;
+      transform: translateY(-7px) scale(1.025);
+    }
+    .game-icon {
+      font-size: 3rem;
+      margin-bottom: 0.9rem;
+      display: block;
+      filter: drop-shadow(0 2px 4px #30374590);
+    }
+    .game-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+      color: #fff;
+      letter-spacing: 0.02em;
+    }
+    .game-desc {
+      font-size: 1rem;
+      color: #adadad;
+      margin-bottom: 1.2rem;
+    }
+    @media (max-width: 600px) {
+      header { font-size: 1.5rem; padding-top: 2rem; }
+      .games-grid { gap: 1.2rem; padding: 0 1rem 2rem 1rem;}
+      .game-card { padding: 1.2rem 0.5rem 1rem 0.5rem; border-radius: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    Gamez Arcade 🎮<br>
+    <span style="font-size:1rem; color:#adadad; font-weight:400;">Launch classics, flex your skills, and vibe out.</span>
+  </header>
+  <main>
+    <section class="games-grid" id="gamesGrid">
+      <!-- Game cards will be rendered here by JS -->
+    </section>
+  </main>
+  <script>
+    // Drop your games here — easy to add new ones!
+    const games = [
+      {
+        title: "Pacman 3",
+        icon: "🟡",
+        file: "pac3.html",
+        desc: "Classic maze runner, yellow and wild. Go munch."
+      },
+      {
+        title: "Space Invaders",
+        icon: "👾",
+        file: "spaceinvaders.html",
+        desc: "Blast the aliens. Retro shooter energy."
+      },
+      {
+        title: "Asteroids",
+        icon: "🪐",
+        file: "asteroids.html",
+        desc: "Dodge, shoot, and survive the space rocks."
+      }
+    ];
+
+    const grid = document.getElementById("gamesGrid");
+    games.forEach(game => {
+      const card = document.createElement('div');
+      card.className = "game-card";
+      card.onclick = () => window.location = game.file;
+
+      card.innerHTML = `
+        <span class="game-icon">${game.icon}</span>
+        <div class="game-title">${game.title}</div>
+        <div class="game-desc">${game.desc}</div>
+        <button style="
+          background: var(--accent); color:#121522; font-size:1.1rem; font-weight:700;
+          border:none; border-radius:0.7rem; padding:0.6rem 1.7rem;
+          margin-top:0.6rem; cursor:pointer; transition:background 0.17s;">
+          PLAY
+        </button>
+      `;
+      card.querySelector('button').onclick = e => {
+        e.stopPropagation();
+        window.location = game.file;
+      };
+
+      grid.appendChild(card);
+    });
+  </script>
+</body>
+</html>
