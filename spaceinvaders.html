@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Invaders</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        /* Basic Reset & Centering */
+        body, html {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: #000; /* Classic black background */
+            color: #fff; /* White text */
+            display: flex;
+            flex-direction: column; /* Stack canvas and controls */
+            align-items: center;
+            justify-content: center;
+            font-family: 'Press Start 2P', cursive; /* Arcade font */
+            overflow: hidden; /* Prevent scrollbars */
+        }
+
+        /* Canvas Styling */
+        canvas {
+            display: block;
+            background-color: #000;
+            box-shadow: 0 0 10px 5px #0f0, 0 0 15px 10px #0f0 inset; /* Green glow effect */
+            border: 2px solid #0f0; /* Green border */
+            border-radius: 8px; /* Slightly rounded corners for the game screen */
+            image-rendering: pixelated; /* Keep the pixel art sharp */
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-optimize-contrast;
+            max-width: 100%; /* Ensure canvas is responsive */
+            max-height: 80vh; /* Limit height on taller screens */
+            aspect-ratio: 4 / 3; /* Maintain a classic aspect ratio */
+        }
+
+        /* Game Controls & Info Area */
+        .game-controls {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .game-controls button {
+            background-color: #222;
+            color: #0f0; /* Green text */
+            border: 2px solid #0f0;
+            padding: 10px 20px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1rem;
+            cursor: pointer;
+            border-radius: 5px;
+            margin: 0 10px;
+            box-shadow: 0 0 5px #0f0;
+            transition: background-color 0.2s, box-shadow 0.2s;
+        }
+
+        .game-controls button:hover, .game-controls button:focus {
+            background-color: #111;
+            box-shadow: 0 0 10px #0f0, 0 0 5px #0f0 inset;
+        }
+
+        .game-controls button:active {
+            transform: translateY(2px);
+        }
+
+        /* Score and Lives Display */
+        #scoreBoard, #livesBoard {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            color: #0f0; /* Green text */
+        }
+
+        /* Game Over / Start Message Box */
+        #messageBox {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 30px;
+            border: 3px solid #0f0;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 100; /* Ensure it's on top */
+            box-shadow: 0 0 15px #0f0;
+            display: none; /* Hidden by default */
+        }
+
+        #messageBox h1 {
+            font-size: 2rem;
+            color: #0f0; /* Green title */
+            margin-bottom: 15px;
+        }
+
+        #messageBox p {
+            font-size: 1rem;
+            margin-bottom: 20px;
+        }
+
+        #messageBox button {
+            background-color: #0f0; /* Green button */
+            color: #000; /* Black text */
+            border: none;
+            padding: 12px 25px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1rem;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.2s, transform 0.2s;
+        }
+         #messageBox button:hover {
+            background-color: #3f3; /* Lighter green */
+            transform: scale(1.05);
+        }
+
+        /* Touch controls for mobile */
+        #touchControls {
+            display: none; /* Hidden by default, shown via JS for touch devices */
+            margin-top: 15px;
+            width: 100%;
+            max-width: 400px; /* Limit width of touch controls */
+            justify-content: space-between;
+        }
+        #touchControls button {
+            font-size: 1.5rem; /* Larger for easier tapping */
+            padding: 15px 20px;
+            width: 30%; /* Distribute space */
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            #touchControls {
+                display: flex; /* Show touch controls on smaller screens */
+            }
+            .game-controls button {
+                padding: 8px 15px;
+                font-size: 0.9rem;
+            }
+             #messageBox h1 {
+                font-size: 1.5rem;
+            }
+            #messageBox p {
+                font-size: 0.9rem;
+            }
+             #messageBox button {
+                padding: 10px 20px;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="scoreBoard">Score: 0</div>
+    <div id="livesBoard">Lives: 3</div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="messageBox">
+        <h1 id="messageTitle">Game Over</h1>
+        <p id="messageText">Your final score: <span id="finalScore">0</span></p>
+        <button id="messageButton">Restart</button>
+    </div>
+
+    <div id="touchControls">
+        <button id="touchLeft">⬅️</button>
+        <button id="touchFire">🔥</button>
+        <button id="touchRight">➡️</button>
+    </div>
+
+    <script>
+        // Get the canvas and its 2D rendering context
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Score and Lives elements
+        const scoreBoard = document.getElementById('scoreBoard');
+        const livesBoard = document.getElementById('livesBoard');
+        const finalScoreDisplay = document.getElementById('finalScore');
+
+        // Message Box elements
+        const messageBox = document.getElementById('messageBox');
+        const messageTitle = document.getElementById('messageTitle');
+        const messageText = document.getElementById('messageText');
+        const messageButton = document.getElementById('messageButton');
+
+        // Game variables
+        let player, invaders, bullets, alienBullets, barriers, ufo; // Added ufo
+        let score = 0;
+        let lives = 3;
+        let gameRunning = false;
+        let alienDirection = 1; // 1 for right, -1 for left
+        let alienSpeed = 0.5; // Initial speed of aliens
+        let alienDropDistance = 20; // How far aliens drop when hitting edge
+        let alienShootInterval = 1000; // Aliens shoot every 1 second (approx)
+        let lastAlienShotTime = 0;
+        const baseAlienSpeed = 0.5;
+        const speedIncreasePerKill = 0.01;
+        let ufoSpawnTimer = 0; // Timer for UFO spawning
+        const ufoSpawnInterval = 15000; // UFO tries to spawn every 15 seconds (approx)
+
+
+        // Player properties
+        const playerWidth = 50;
+        const playerHeight = 30;
+        const playerSpeed = 5;
+
+        // Bullet properties
+        const bulletWidth = 5;
+        const bulletHeight = 15;
+        const bulletSpeed = 7;
+
+        // Alien properties
+        const alienRows = 5;
+        const alienCols = 10;
+        const alienWidth = 30;
+        const alienHeight = 20;
+        const alienPadding = 10; // Padding between aliens
+        const alienOffsetTop = 30; // Starting Y offset for aliens
+        const alienOffsetLeft = 30; // Starting X offset for aliens
+
+        // Barrier properties
+        const barrierCount = 4;
+        const barrierWidth = 70;
+        const barrierHeight = 30;
+        const barrierSegmentSize = 10;
+
+        // UFO properties
+        const ufoWidth = 45;
+        const ufoHeight = 20;
+        const ufoSpeed = 2;
+        const ufoColor = '#ff0000'; // Red UFO
+        const ufoPoints = 100; // Points for hitting UFO
+
+        // Key press states
+        const keys = {
+            ArrowLeft: false,
+            ArrowRight: false,
+            Space: false
+        };
+
+        // Function to set canvas size (responsive)
+        function resizeCanvas() {
+            const aspectRatio = 4 / 3;
+            let newWidth = window.innerWidth * 0.9;
+            let newHeight = newWidth / aspectRatio;
+
+            if (newHeight > window.innerHeight * 0.7) {
+                newHeight = window.innerHeight * 0.7;
+                newWidth = newHeight * aspectRatio;
+            }
+            canvas.width = Math.floor(newWidth);
+            canvas.height = Math.floor(newHeight);
+
+            if (gameRunning || lives <= 0) {
+                const currentScore = score;
+                const currentLives = lives;
+                const wasGameOver = lives <=0;
+                const ufoActive = ufo && ufo.alive; // Check if UFO was active
+
+                initGame();
+
+                score = currentScore;
+                lives = currentLives;
+                updateScoreboard();
+                updateLivesBoard();
+
+                if (ufoActive) { // If UFO was active, try to respawn it (or just reset its timer)
+                    // For simplicity, we'll just let it respawn naturally via its timer.
+                    // Or, you could try to reposition it if it was on screen.
+                }
+
+                if (wasGameOver) {
+                    showGameOverMessage();
+                }
+            }
+        }
+
+        // Player object
+        function createPlayer() {
+            return {
+                x: canvas.width / 2 - playerWidth / 2,
+                y: canvas.height - playerHeight - 20,
+                width: playerWidth,
+                height: playerHeight,
+                color: '#0f0'
+            };
+        }
+
+        // Invader object
+        function createInvader(x, y, type) {
+            return {
+                x: x, y: y, width: alienWidth, height: alienHeight,
+                color: type === 1 ? '#f0f' : (type === 2 ? '#0ff' : '#ff0'),
+                type: type, alive: true
+            };
+        }
+
+        // Bullet object
+        function createBullet(x, y, color, velocityY) {
+            return { x: x, y: y, width: bulletWidth, height: bulletHeight, color: color, velocityY: velocityY };
+        }
+
+        // Barrier Segment object
+        function createBarrierSegment(x, y) {
+            return { x: x, y: y, width: barrierSegmentSize, height: barrierSegmentSize, color: '#0c0', hits: 0, maxHits: 3, alive: true };
+        }
+
+        // UFO object
+        function createUFO() {
+            const direction = Math.random() < 0.5 ? 1 : -1; // 1 for right, -1 for left
+            return {
+                x: direction === 1 ? -ufoWidth : canvas.width, // Start off-screen
+                y: alienOffsetTop / 2, // Fly above the top row of aliens
+                width: ufoWidth,
+                height: ufoHeight,
+                speed: ufoSpeed * direction,
+                color: ufoColor,
+                alive: true,
+                points: ufoPoints
+            };
+        }
+
+
+        // Initialize barriers
+        function initBarriers() {
+            barriers = [];
+            const barrierSpacing = (canvas.width - (barrierCount * barrierWidth)) / (barrierCount + 1);
+            const barrierY = canvas.height - playerHeight - 80; // Adjusted Y for barriers
+
+            for (let i = 0; i < barrierCount; i++) {
+                const barrierX = barrierSpacing * (i + 1) + barrierWidth * i;
+                const barrier = [];
+                for (let r = 0; r < barrierHeight / barrierSegmentSize; r++) {
+                    for (let c = 0; c < barrierWidth / barrierSegmentSize; c++) {
+                        barrier.push(createBarrierSegment(
+                            barrierX + c * barrierSegmentSize,
+                            barrierY + r * barrierSegmentSize
+                        ));
+                    }
+                }
+                barriers.push(barrier);
+            }
+        }
+
+        // Initialize game elements
+        function initGame() {
+            player = createPlayer();
+            invaders = [];
+            bullets = [];
+            alienBullets = [];
+            ufo = null; // UFO starts as null
+            ufoSpawnTimer = Date.now(); // Reset UFO spawn timer
+            score = 0;
+            lives = 3;
+            alienDirection = 1;
+            alienSpeed = baseAlienSpeed;
+            lastAlienShotTime = 0;
+            updateScoreboard();
+            updateLivesBoard();
+            hideMessage();
+            gameRunning = true;
+
+            for (let row = 0; row < alienRows; row++) {
+                for (let col = 0; col < alienCols; col++) {
+                    const alienX = alienOffsetLeft + col * (alienWidth + alienPadding);
+                    const alienY = alienOffsetTop + row * (alienHeight + alienPadding);
+                    const type = (row % 3) + 1;
+                    invaders.push(createInvader(alienX, alienY, type));
+                }
+            }
+            initBarriers();
+        }
+
+        // Draw player
+        function drawPlayer() {
+            ctx.fillStyle = player.color;
+            ctx.beginPath();
+            ctx.moveTo(player.x + player.width / 2, player.y);
+            ctx.lineTo(player.x, player.y + player.height);
+            ctx.lineTo(player.x + player.width, player.y + player.height);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // Draw invaders
+        function drawInvaders() {
+            invaders.forEach(invader => {
+                if (invader.alive) {
+                    ctx.fillStyle = invader.color;
+                    ctx.fillRect(invader.x, invader.y, invader.width, invader.height);
+                    ctx.fillStyle = 'black'; // Eyes
+                    ctx.fillRect(invader.x + invader.width * 0.2, invader.y + invader.height * 0.2, 4, 4);
+                    ctx.fillRect(invader.x + invader.width * 0.6, invader.y + invader.height * 0.2, 4, 4);
+                }
+            });
+        }
+
+        // Draw bullets
+        function drawBullets() {
+            bullets.forEach(bullet => {
+                ctx.fillStyle = bullet.color;
+                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+            });
+            alienBullets.forEach(bullet => {
+                ctx.fillStyle = bullet.color;
+                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+            });
+        }
+
+        // Draw barriers
+        function drawBarriers() {
+            barriers.forEach(barrier => {
+                barrier.forEach(segment => {
+                    if (segment.alive) {
+                        const opacity = 1 - (segment.hits / segment.maxHits) * 0.7;
+                        ctx.fillStyle = `rgba(0, 204, 0, ${opacity})`;
+                        ctx.fillRect(segment.x, segment.y, segment.width, segment.height);
+                    }
+                });
+            });
+        }
+
+        // Draw UFO
+        function drawUFO() {
+            if (ufo && ufo.alive) {
+                ctx.fillStyle = ufo.color;
+                // Simple saucer shape for UFO
+                ctx.beginPath();
+                ctx.ellipse(ufo.x + ufo.width / 2, ufo.y + ufo.height / 2, ufo.width / 2, ufo.height / 2, 0, Math.PI, 2 * Math.PI);
+                ctx.lineTo(ufo.x + ufo.width, ufo.y + ufo.height);
+                ctx.lineTo(ufo.x, ufo.y + ufo.height);
+                ctx.closePath();
+                ctx.fill();
+
+                // Optional: add a "cockpit"
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'; // Semi-transparent white
+                ctx.beginPath();
+                ctx.ellipse(ufo.x + ufo.width / 2, ufo.y + ufo.height * 0.4, ufo.width * 0.3, ufo.height * 0.25, 0, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+        }
+
+
+        // Update player position
+        function updatePlayer() {
+            if (keys.ArrowLeft && player.x > 0) player.x -= playerSpeed;
+            if (keys.ArrowRight && player.x < canvas.width - player.width) player.x += playerSpeed;
+        }
+
+        // Update bullets position
+        function updateBullets() {
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                bullets[i].y += bullets[i].velocityY;
+                if (bullets[i].y < 0) bullets.splice(i, 1);
+            }
+            for (let i = alienBullets.length - 1; i >= 0; i--) {
+                alienBullets[i].y += alienBullets[i].velocityY;
+                if (alienBullets[i].y > canvas.height) alienBullets.splice(i, 1);
+            }
+        }
+
+        // Update invaders position
+        function updateInvaders() {
+            let moveDown = false;
+            invaders.forEach(invader => {
+                if (invader.alive) {
+                    invader.x += alienSpeed * alienDirection;
+                    if (invader.x + invader.width > canvas.width || invader.x < 0) moveDown = true;
+                    if (invader.y + invader.height >= player.y) { gameOver(); return; }
+                }
+            });
+
+            if (moveDown) {
+                alienDirection *= -1;
+                invaders.forEach(invader => { if (invader.alive) invader.y += alienDropDistance; });
+            }
+
+            const currentTime = Date.now();
+            if (currentTime - lastAlienShotTime > alienShootInterval) {
+                const shootingInvaders = invaders.filter(inv => inv.alive);
+                if (shootingInvaders.length > 0) {
+                    const randomInvader = shootingInvaders[Math.floor(Math.random() * shootingInvaders.length)];
+                    alienBullets.push(createBullet(
+                        randomInvader.x + randomInvader.width / 2 - bulletWidth / 2,
+                        randomInvader.y + randomInvader.height, '#f00', bulletSpeed / 1.5
+                    ));
+                    lastAlienShotTime = currentTime;
+                }
+            }
+        }
+
+        // Update UFO position and spawning
+        function updateUFO() {
+            const currentTime = Date.now();
+            // Try to spawn UFO
+            if (!ufo && currentTime - ufoSpawnTimer > ufoSpawnInterval) {
+                if (Math.random() < 0.3) { // 30% chance to spawn if timer is up
+                    ufo = createUFO();
+                }
+                ufoSpawnTimer = currentTime; // Reset timer whether it spawned or not
+            }
+
+            // Move UFO if it exists and is alive
+            if (ufo && ufo.alive) {
+                ufo.x += ufo.speed;
+                // Despawn if it goes off-screen
+                if ((ufo.speed > 0 && ufo.x > canvas.width) || (ufo.speed < 0 && ufo.x + ufo.width < 0)) {
+                    ufo = null; // Set UFO to null so it can respawn later
+                }
+            }
+        }
+
+
+        // Collision detection
+        function checkCollisions() {
+            // Player bullets vs Invaders
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                for (let j = invaders.length - 1; j >= 0; j--) {
+                    if (invaders[j].alive && bullets[i] &&
+                        bullets[i].x < invaders[j].x + invaders[j].width &&
+                        bullets[i].x + bullets[i].width > invaders[j].x &&
+                        bullets[i].y < invaders[j].y + invaders[j].height &&
+                        bullets[i].y + bullets[i].height > invaders[j].y) {
+                        invaders[j].alive = false;
+                        bullets.splice(i, 1);
+                        score += 10 * invaders[j].type;
+                        updateScoreboard();
+                        alienSpeed += speedIncreasePerKill;
+                        break;
+                    }
+                }
+            }
+
+            // Player bullets vs UFO
+            if (ufo && ufo.alive) {
+                for (let i = bullets.length - 1; i >= 0; i--) {
+                    if (bullets[i].x < ufo.x + ufo.width &&
+                        bullets[i].x + bullets[i].width > ufo.x &&
+                        bullets[i].y < ufo.y + ufo.height &&
+                        bullets[i].y + bullets[i].height > ufo.y) {
+                        
+                        ufo.alive = false; // UFO is hit
+                        bullets.splice(i, 1); // Remove bullet
+                        score += ufo.points;
+                        updateScoreboard();
+                        // Play UFO explosion sound/animation here (optional)
+                        ufo = null; // Allow new UFO to spawn
+                        break; 
+                    }
+                }
+            }
+
+
+            // Alien bullets vs Player
+            for (let i = alienBullets.length - 1; i >= 0; i--) {
+                if (alienBullets[i].x < player.x + player.width &&
+                    alienBullets[i].x + alienBullets[i].width > player.x &&
+                    alienBullets[i].y < player.y + player.height &&
+                    alienBullets[i].y + alienBullets[i].height > player.y) {
+                    alienBullets.splice(i, 1);
+                    lives--;
+                    updateLivesBoard();
+                    if (lives <= 0) gameOver();
+                    break;
+                }
+            }
+
+            // Bullets (both player and alien) vs Barriers
+            const allBullets = [...bullets, ...alienBullets];
+            for (let i = allBullets.length - 1; i >= 0; i--) {
+                const bullet = allBullets[i];
+                let bulletRemoved = false; // Flag to track if bullet was removed
+                for (let b = 0; b < barriers.length; b++) {
+                    for (let s = barriers[b].length - 1; s >= 0; s--) {
+                        const segment = barriers[b][s];
+                        if (segment.alive && bullet &&
+                            bullet.x < segment.x + segment.width &&
+                            bullet.x + bullet.width > segment.x &&
+                            bullet.y < segment.y + segment.height &&
+                            bullet.y + bullet.height > segment.y) {
+                            segment.hits++;
+                            if (segment.hits >= segment.maxHits) segment.alive = false;
+                            
+                            // Remove the bullet
+                            if (bullet.velocityY < 0) { // Player bullet
+                                const bulletIndex = bullets.indexOf(bullet);
+                                if (bulletIndex > -1) bullets.splice(bulletIndex, 1);
+                            } else { // Alien bullet
+                                const bulletIndex = alienBullets.indexOf(bullet);
+                                if (bulletIndex > -1) alienBullets.splice(bulletIndex, 1);
+                            }
+                            bulletRemoved = true;
+                            break; // Segment hit, bullet gone, exit inner loop
+                        }
+                    }
+                    if (bulletRemoved) break; // Bullet gone, exit barrier loop
+                }
+            }
+
+
+            // Check for win condition
+            const aliveInvaders = invaders.filter(inv => inv.alive).length;
+            if (aliveInvaders === 0 && gameRunning) gameWon();
+        }
+
+        function updateScoreboard() { scoreBoard.textContent = `Score: ${score}`; }
+        function updateLivesBoard() { livesBoard.textContent = `Lives: ${lives}`; }
+
+        function showMessage(title, text, buttonText, onButtonClick) {
+            messageTitle.textContent = title;
+            messageText.innerHTML = text;
+            messageButton.textContent = buttonText;
+            messageBox.style.display = 'block';
+            messageButton.onclick = () => {
+                hideMessage();
+                if (onButtonClick) onButtonClick();
+            };
+        }
+        function hideMessage() { messageBox.style.display = 'none'; }
+        
+        function showGameOverMessage() {
+            finalScoreDisplay.textContent = score;
+             showMessage("Game Over", `Your final score: <span id="finalScore">${score}</span>`, "Restart Game", initGame);
+        }
+
+        function gameOver() { gameRunning = false; showGameOverMessage(); }
+        function gameWon() {
+            gameRunning = false;
+            finalScoreDisplay.textContent = score;
+            showMessage("You Win!", `Congratulations! Your score: <span id="finalScore">${score}</span>`, "Play Again", initGame);
+        }
+
+        // Game loop
+        function gameLoop(timestamp) {
+            if (!gameRunning) {
+                if (lives <= 0 || invaders.filter(inv => inv.alive).length === 0) {
+                     if (lives <= 0 && messageBox.style.display === 'none') gameOver();
+                     else if (invaders.filter(inv => inv.alive).length === 0 && messageBox.style.display === 'none') gameWon();
+                }
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            updatePlayer();
+            updateBullets();
+            updateInvaders();
+            updateUFO(); // Update UFO logic
+            checkCollisions();
+            drawPlayer();
+            drawInvaders();
+            drawBullets();
+            drawBarriers();
+            drawUFO(); // Draw the UFO
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
+            if (e.key === ' ' || e.key === 'Spacebar') {
+                e.preventDefault();
+                if (gameRunning && bullets.length < 5) {
+                    bullets.push(createBullet(player.x + player.width / 2 - bulletWidth / 2, player.y, '#0f0', -bulletSpeed));
+                }
+            }
+            if (!gameRunning && lives > 0 && (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === ' ')) {
+                 if (messageBox.style.display !== 'none' && messageButton.textContent.includes("Start")) {
+                    // Start button on message box will handle it
+                 } else if (lives > 0) {
+                    initGame(); // Initialize and start the game
+                    // The game loop is started by the "Start Game" button now
+                 }
+            }
+        });
+        window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = false; });
+
+        const touchLeftButton = document.getElementById('touchLeft');
+        const touchRightButton = document.getElementById('touchRight');
+        const touchFireButton = document.getElementById('touchFire');
+        const touchControlsDiv = document.getElementById('touchControls');
+
+        function isTouchDevice() { return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0); }
+
+        if (isTouchDevice()) {
+            touchControlsDiv.style.display = 'flex';
+            touchLeftButton.addEventListener('touchstart', (e) => { e.preventDefault(); keys.ArrowLeft = true; });
+            touchLeftButton.addEventListener('touchend', (e) => { e.preventDefault(); keys.ArrowLeft = false; });
+            touchRightButton.addEventListener('touchstart', (e) => { e.preventDefault(); keys.ArrowRight = true; });
+            touchRightButton.addEventListener('touchend', (e) => { e.preventDefault(); keys.ArrowRight = false; });
+            touchFireButton.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (gameRunning && bullets.length < 5) {
+                    bullets.push(createBullet(player.x + player.width / 2 - bulletWidth / 2, player.y, '#0f0', -bulletSpeed));
+                }
+                 if (!gameRunning && lives > 0) {
+                    if (messageBox.style.display !== 'none' && messageButton.textContent.includes("Start")) {
+                        // Start button will handle
+                    } else if (lives > 0) {
+                        initGame();
+                         // The game loop is started by the "Start Game" button now
+                    }
+                }
+            });
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        showMessage("Space Invaders", "Press Space or Tap Fire to Start!", "Start Game", () => {
+            initGame();
+            requestAnimationFrame(gameLoop);
+        });
+    </script>
+</body>
+</html>
