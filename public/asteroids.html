@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asteroids Game</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #000;
+            overflow: hidden;
+        }
+        canvas {
+            border: 2px solid #fff;
+        }
+        #gameOver {
+            display: none;
+            position: absolute;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div id="gameOver">
+        <h1>Game Over</h1>
+        <p>Score: <span id="finalScore"></span></p>
+        <p>Press R to Restart</p>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameOverDiv = document.getElementById('gameOver');
+        const finalScoreSpan = document.getElementById('finalScore');
+
+        // Game state
+        let ship = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            angle: 0,
+            speed: 0,
+            vx: 0,
+            vy: 0
+        };
+        let asteroids = [];
+        let bullets = [];
+        let ufo = null;
+        let ufoBullets = [];
+        let score = 0;
+        let gameOver = false;
+        let lastUfoShot = 0;
+
+        // Controls
+        let keys = { left: false, right: false, up: false, space: false };
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') keys.left = true;
+            if (e.key === 'ArrowRight') keys.right = true;
+            if (e.key === 'ArrowUp') keys.up = true;
+            if (e.key === ' ') keys.space = true;
+            if (e.key.toLowerCase() === 'r' && gameOver) resetGame();
+        });
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft') keys.left = false;
+            if (e.key === 'ArrowRight') keys.right = false;
+            if (e.key === 'ArrowUp') keys.up = false;
+            if (e.key === ' ') keys.space = false;
+        });
+
+        // Create asteroids with irregular shape
+        function createAsteroid(size, x, y) {
+            const numVertices = 8 + Math.floor(Math.random() * 4);
+            const vertices = [];
+            for (let i = 0; i < numVertices; i++) {
+                const angle = (i / numVertices) * Math.PI * 2;
+                const radius = size * (0.8 + Math.random() * 0.4);
+                vertices.push({
+                    x: Math.cos(angle) * radius,
+                    y: Math.sin(angle) * radius
+                });
+            }
+            return {
+                x: x || Math.random() * canvas.width,
+                y: y || Math.random() * canvas.height,
+                size: size || 50,
+                vx: (Math.random() - 0.5) * 4,
+                vy: (Math.random() - 0.5) * 4,
+                vertices: vertices
+            };
+        }
+
+        // Create UFO
+        function createUfo() {
+            const side = Math.random() < 0.5 ? 0 : canvas.width;
+            return {
+                x: side,
+                y: Math.random() * canvas.height,
+                size: 20,
+                vx: side === 0 ? 2 : -2,
+                vy: 0,
+                active: true
+            };
+        }
+
+        function initAsteroids() {
+            for (let i = 0; i < 5; i++) {
+                asteroids.push(createAsteroid(50));
+            }
+        }
+
+        // Reset game
+        function resetGame() {
+            ship = { x: canvas.width / 2, y: canvas.height / 2, angle: 0, speed: 0, vx: 0, vy: 0 };
+            asteroids = [];
+            bullets = [];
+            ufo = null;
+            ufoBullets = [];
+            score = 0;
+            gameOver = false;
+            gameOverDiv.style.display = 'none';
+            lastUfoShot = 0;
+            initAsteroids();
+        }
+
+        // Update game
+        function update() {
+            if (gameOver) return;
+
+            // Update ship
+            if (keys.left) ship.angle -= 0.05;
+            if (keys.right) ship.angle += 0.05;
+            if (keys.up) {
+                ship.speed = 3;
+                ship.vx = Math.cos(ship.angle) * ship.speed;
+                ship.vy = Math.sin(ship.angle) * ship.speed;
+            } else {
+                ship.speed *= 0.98;
+                ship.vx *= 0.98;
+                ship.vy *= 0.98;
+            }
+            ship.x += ship.vx;
+            ship.y += ship.vy;
+
+            // Wrap ship around canvas
+            if (ship.x < 0) ship.x += canvas.width;
+            if (ship.x > canvas.width) ship.x -= canvas.width;
+            if (ship.y < 0) ship.y += canvas.height;
+            if (ship.y > canvas.height) ship.y -= canvas.height;
+
+            // Shoot bullets
+            if (keys.space && bullets.length < 5) {
+                bullets.push({
+                    x: ship.x,
+                    y: ship.y,
+                    vx: Math.cos(ship.angle) * 7,
+                    vy: Math.sin(ship.angle) * 7,
+                    life: 50
+                });
+                keys.space = false;
+            }
+
+            // Update bullets
+            bullets.forEach((bullet, i) => {
+                bullet.x += bullet.vx;
+                bullet.y += bullet.vy;
+                bullet.life--;
+                if (bullet.life <= 0 || bullet.x < 0 || bullet.x > canvas.width || bullet.y < 0 || bullet.y > canvas.height) {
+                    bullets.splice(i, 1);
+                }
+            });
+
+            // Update asteroids
+            asteroids.forEach((asteroid) => {
+                asteroid.x += asteroid.vx;
+                asteroid.y += asteroid.vy;
+                if (asteroid.x < 0) asteroid.x += canvas.width;
+                if (asteroid.x > canvas.width) asteroid.x -= canvas.width;
+                if (asteroid.y < 0) asteroid.y += canvas.height;
+                if (asteroid.y > canvas.height) asteroid.y -= canvas.height;
+            });
+
+            // Update UFO
+            if (!ufo && Math.random() < 0.02) {
+                ufo = createUfo();
+            }
+            if (ufo) {
+                ufo.x += ufo.vx;
+                if (ufo.x < 0 || ufo.x > canvas.width) {
+                    ufo = null;
+                } else {
+                    // UFO shoots every 2 seconds
+                    lastUfoShot++;
+                    if (lastUfoShot > 120) {
+                        lastUfoShot = 0;
+                        const dx = ship.x - ufo.x;
+                        const dy = ship.y - ufo.y;
+                        const angle = Math.atan2(dy, dx);
+                        ufoBullets.push({
+                            x: ufo.x,
+                            y: ufo.y,
+                            vx: Math.cos(angle) * 5,
+                            vy: Math.sin(angle) * 5,
+                            life: 60
+                        });
+                    }
+                }
+            }
+
+            // Update UFO bullets
+            ufoBullets.forEach((bullet, i) => {
+                bullet.x += bullet.vx;
+                bullet.y += bullet.vy;
+                bullet.life--;
+                if (bullet.life <= 0 || bullet.x < 0 || bullet.x > canvas.width || bullet.y < 0 || bullet.y > canvas.height) {
+                    ufoBullets.splice(i, 1);
+                }
+            });
+
+            // Check collisions
+            asteroids.forEach((asteroid, i) => {
+                // Ship-asteroid collision
+                let dx = ship.x - asteroid.x;
+                let dy = ship.y - asteroid.y;
+                let distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < asteroid.size + 10) {
+                    gameOver = true;
+                    gameOverDiv.style.display = 'block';
+                    finalScoreSpan.textContent = score;
+                }
+
+                // Bullet-asteroid collision
+                bullets.forEach((bullet, j) => {
+                    dx = bullet.x - asteroid.x;
+                    dy = bullet.y - asteroid.y;
+                    distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance < asteroid.size) {
+                        bullets.splice(j, 1);
+                        asteroids.splice(i, 1);
+                        score += 10;
+                        if (asteroid.size > 20) {
+                            asteroids.push(createAsteroid(asteroid.size / 2, asteroid.x, asteroid.y));
+                            asteroids.push(createAsteroid(asteroid.size / 2, asteroid.x, asteroid.y));
+                        }
+                        if (asteroids.length === 0) {
+                            initAsteroids();
+                        }
+                    }
+                });
+            });
+
+            // Ship-UFO bullet collision
+            ufoBullets.forEach((bullet, i) => {
+                const dx = ship.x - bullet.x;
+                const dy = ship.y - bullet.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < 10) {
+                    gameOver = true;
+                    gameOverDiv.style.display = 'block';
+                    finalScoreSpan.textContent = score;
+                    ufoBullets.splice(i, 1);
+                }
+            });
+
+            // Bullet-UFO collision
+            if (ufo) {
+                bullets.forEach((bullet, i) => {
+                    const dx = bullet.x - ufo.x;
+                    const dy = bullet.y - ufo.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance < ufo.size) {
+                        bullets.splice(i, 1);
+                        ufo = null;
+                        score += 50;
+                    }
+                });
+            }
+        }
+
+        // Draw game
+        function draw() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw ship
+            ctx.save();
+            ctx.translate(ship.x, ship.y);
+            ctx.rotate(ship.angle);
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.moveTo(15, 0);
+            ctx.lineTo(-10, 10);
+            ctx.lineTo(-10, -10);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+
+            // Draw asteroids
+            asteroids.forEach((asteroid) => {
+                ctx.beginPath();
+                ctx.moveTo(
+                    asteroid.x + asteroid.vertices[0].x,
+                    asteroid.y + asteroid.vertices[0].y
+                );
+                for (let i = 1; i < asteroid.vertices.length; i++) {
+                    ctx.lineTo(
+                        asteroid.x + asteroid.vertices[i].x,
+                        asteroid.y + asteroid.vertices[i].y
+                    );
+                }
+                ctx.closePath();
+                ctx.strokeStyle = 'white';
+                ctx.stroke();
+            });
+
+            // Draw bullets
+            bullets.forEach((bullet) => {
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, 2, 0, Math.PI * 2);
+                ctx.fillStyle = 'white';
+                ctx.fill();
+            });
+
+            // Draw UFO
+            if (ufo) {
+                ctx.beginPath();
+                ctx.ellipse(ufo.x, ufo.y, ufo.size, ufo.size / 2, 0, 0, Math.PI * 2);
+                ctx.strokeStyle = 'white';
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(ufo.x, ufo.y - ufo.size / 2, ufo.size / 2, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            // Draw UFO bullets
+            ufoBullets.forEach((bullet) => {
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, 2, 0, Math.PI * 2);
+                ctx.fillStyle = 'red';
+                ctx.fill();
+            });
+
+            // Draw score
+            ctx.fillStyle = 'white';
+            ctx.font = '20px Arial';
+            ctx.fillText('Score: ' + score, 10, 30);
+        }
+
+        // Game loop
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start game
+        initAsteroids();
+        gameLoop();
+    </script>
+</body>
+</html>

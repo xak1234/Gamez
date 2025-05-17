@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Pac-Man</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body, html {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Press Start 2P', cursive;
+            overflow: hidden;
+        }
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative; /* For message box positioning */
+        }
+        canvas {
+            display: block;
+            background-color: #000;
+            border: 2px solid #00f; /* Blue border like classic Pac-Man */
+            max-width: 90vw;
+            max-height: 70vh;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-optimize-contrast;
+        }
+        #gameInfo {
+            width: 100%;
+            max-width: 500px; /* Match typical canvas width */
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            font-size: 1rem;
+        }
+        #scoreBoard, #livesBoard {
+            color: #fff;
+        }
+        #messageBox {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.9);
+            color: #fff;
+            padding: 25px;
+            border: 2px solid #ff0; /* Yellow border */
+            border-radius: 10px;
+            text-align: center;
+            z-index: 100;
+            display: none; /* Hidden by default */
+        }
+        #messageBox h1 {
+            font-size: 1.8rem;
+            color: #ff0; /* Yellow title */
+            margin-bottom: 15px;
+        }
+        #messageBox p {
+            font-size: 1rem;
+            margin-bottom: 20px;
+        }
+        #messageBox button {
+            background-color: #ff0; /* Yellow button */
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1rem;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.2s;
+        }
+        #messageBox button:hover {
+            background-color: #ffa500; /* Orange hover */
+        }
+
+        #touchControls {
+            display: none; /* Hidden by default */
+            margin-top: 15px;
+            text-align: center;
+        }
+        #touchControls button {
+            background-color: #333;
+            color: #fff;
+            border: 1px solid #fff;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1.5rem; /* Larger for touch */
+            padding: 10px;
+            margin: 5px;
+            min-width: 60px; /* Ensure decent tap area */
+            min-height: 60px;
+            border-radius: 8px;
+        }
+         @media (max-width: 600px) {
+            #gameInfo{ font-size: 0.8rem;}
+            #messageBox h1 { font-size: 1.5rem; }
+            #messageBox p { font-size: 0.9rem; }
+            #touchControls { display: grid; grid-template-columns: repeat(3, 1fr); width: 200px; gap:5px;}
+            #touchControls .up { grid-column: 2; }
+            #touchControls .left { grid-column: 1; grid-row: 2; }
+            #touchControls .right { grid-column: 3; grid-row: 2; }
+            #touchControls .down { grid-column: 2; grid-row: 3; }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="gameInfo">
+            <div id="scoreBoard">Score: 0</div>
+            <div id="livesBoard">Lives: 3</div>
+        </div>
+        <canvas id="gameCanvas"></canvas>
+        <div id="messageBox">
+            <h1 id="messageTitle">Game Over</h1>
+            <p id="messageText">Your final score: <span id="finalScore">0</span></p>
+            <button id="messageButton">Restart</button>
+        </div>
+    </div>
+     <div id="touchControls">
+        <button class="up" id="touchUp">⬆️</button>
+        <button class="left" id="touchLeft">⬅️</button>
+        <button class="right" id="touchRight">➡️</button>
+        <button class="down" id="touchDown">⬇️</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreBoard = document.getElementById('scoreBoard');
+        const livesBoard = document.getElementById('livesBoard');
+        const finalScoreDisplay = document.getElementById('finalScore');
+        const messageBox = document.getElementById('messageBox');
+        const messageTitle = document.getElementById('messageTitle');
+        const messageText = document.getElementById('messageText');
+        const messageButton = document.getElementById('messageButton');
+
+        const TILE_SIZE = 20; // Size of each tile in the maze
+        let maze; // This will be the mutable copy of MAZE_LAYOUT for pellets
+        let pacman;
+        let ghosts = [];
+        let pellets = [];
+        let score = 0;
+        let lives = 3;
+        let gameRunning = false;
+        let frightenedMode = false;
+        let frightenedTimer = 0;
+        const FRIGHTENED_DURATION = 7000; // 7 seconds
+
+        // Updated MAZE_LAYOUT as per user request
+        const MAZE_LAYOUT = [ 
+            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1],
+            [1,3,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,3,1],
+            [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
+            [1,2,1,1,2,1,1,1,2,2,2,1,1,1,2,1,1,2,1], // User's provided maze
+            [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+            [1,2,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,2,1],
+            [1,2,2,2,2,1,2,2,2,2,2,2,2,1,2,2,2,2,1],
+            [1,1,1,1,2,1,1,1,1,2,1,1,1,1,2,1,1,1,1], 
+            [1,1,1,1,2,1,1,1,4,2,2,2,2,2,2,1,0,0,0], 
+            [1,1,1,1,2,1,1,1,1,2,1,1,1,1,2,1,1,1,1], 
+            [2,2,2,2,2,2,2,2,2,2,0,1,0,2,2,2,2,2,2], 
+            [1,1,1,1,2,1,0,1,1,1,1,1,0,1,2,1,1,1,1], 
+            [2,2,2,2,2,1,0,0,2,5,0,0,0,1,2,2,2,2,2], 
+            [1,1,1,1,2,1,0,1,2,1,1,1,0,1,2,1,1,1,1], 
+            [2,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,2],
+            [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
+            [1,2,2,1,2,2,2,2,2,2,2,2,2,2,2,1,2,2,1],
+            [1,1,2,1,2,1,2,1,1,1,1,1,2,1,2,1,2,1,1],
+            [1,3,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,3,1],
+            [1,2,1,1,1,1,1,1,2,1,2,1,1,1,1,1,1,2,1],
+            [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1]
+        ];
+        // Updated TUNNEL_ROW_INDICES based on the new MAZE_LAYOUT
+        const TUNNEL_ROW_INDICES = [10, 12, 14]; 
+        const GHOST_DOOR_POS = { x: 9, y: 7 }; // Grid coordinates of the ghost house door (MAZE_LAYOUT[7][9] is the door tile 0)
+
+
+        function resizeCanvas() {
+            const mazeHeight = MAZE_LAYOUT.length * TILE_SIZE;
+            const mazeWidth = MAZE_LAYOUT[0].length * TILE_SIZE;
+            canvas.width = mazeWidth;
+            canvas.height = mazeHeight;
+            const gameInfo = document.getElementById('gameInfo');
+            if (gameInfo) gameInfo.style.maxWidth = `${mazeWidth}px`;
+        }
+
+        class PacMan {
+            constructor(x, y) {
+                this.x = x; this.y = y; this.radius = TILE_SIZE / 2 - 2; this.speed = 2; 
+                this.dx = 0; this.dy = 0; this.nextDx = 0; this.nextDy = 0;
+                this.mouthOpen = true; this.mouthAngle = 0.2 * Math.PI; this.mouthSpeed = 0.05 * Math.PI; 
+                this.color = '#ff0'; 
+            }
+            draw() {
+                ctx.fillStyle = this.color; ctx.beginPath();
+                const angle = (this.dx === 0 && this.dy === 0 && this.nextDx === 0 && this.nextDy === 0) ? 0 : Math.atan2(this.dy || this.nextDy, this.dx || this.nextDx);
+                ctx.arc(this.x + TILE_SIZE / 2, this.y + TILE_SIZE / 2, this.radius, angle + this.mouthAngle, angle - this.mouthAngle);
+                ctx.lineTo(this.x + TILE_SIZE / 2, this.y + TILE_SIZE / 2); ctx.fill();
+                if (this.mouthOpen) { this.mouthAngle += this.mouthSpeed; if (this.mouthAngle >= 0.4 * Math.PI) this.mouthOpen = false; } 
+                else { this.mouthAngle -= this.mouthSpeed; if (this.mouthAngle <= 0.05 * Math.PI) this.mouthOpen = true; }
+            }
+            update() {
+                const onGridXStrict = (this.x % TILE_SIZE === 0);
+                const onGridYStrict = (this.y % TILE_SIZE === 0);
+
+                if (this.nextDx !== 0 || this.nextDy !== 0) {
+                    if (this.nextDx !== 0 && onGridYStrict) {
+                        const checkY = this.y / TILE_SIZE;
+                        const checkX = Math.floor((this.x + this.nextDx * TILE_SIZE ) / TILE_SIZE);
+                        if (!this.isWall(checkX, checkY, true)) { 
+                            this.dx = this.nextDx; this.dy = 0; this.nextDx = 0; this.nextDy = 0;
+                        }
+                    } else if (this.nextDy !== 0 && onGridXStrict) {
+                        const checkX = this.x / TILE_SIZE;
+                        const checkY = Math.floor((this.y + this.nextDy * TILE_SIZE ) / TILE_SIZE);
+                        if (!this.isWall(checkX, checkY, true)) { 
+                            this.dx = 0; this.dy = this.nextDy; this.nextDx = 0; this.nextDy = 0;
+                        }
+                    }
+                }
+
+                const targetX = this.x + this.dx * this.speed;
+                const targetY = this.y + this.dy * this.speed;
+                const currentTileX = Math.floor(this.x / TILE_SIZE);
+                const currentTileY = Math.floor(this.y / TILE_SIZE);
+                
+                if (this.dx !== 0) {
+                    const nextWallCheckX = Math.floor((targetX + (this.dx > 0 ? TILE_SIZE - 0.1 : 0.1)) / TILE_SIZE);
+                    if (!this.isWall(nextWallCheckX, currentTileY, false)) this.x = targetX; 
+                    else this.x = Math.round(this.x / TILE_SIZE) * TILE_SIZE;
+                }
+                if (this.dy !== 0) {
+                    const nextWallCheckY = Math.floor((targetY + (this.dy > 0 ? TILE_SIZE - 0.1 : 0.1)) / TILE_SIZE);
+                    if (!this.isWall(currentTileX, nextWallCheckY, false)) this.y = targetY; 
+                    else this.y = Math.round(this.y / TILE_SIZE) * TILE_SIZE;
+                }
+                
+                const characterGridY = Math.floor(this.y / TILE_SIZE);
+                const characterPixelYOnGrid = characterGridY * TILE_SIZE;
+                const isVerticallyAlignedForTunnel = (Math.abs(this.y - characterPixelYOnGrid) < this.speed);
+
+
+                if (TUNNEL_ROW_INDICES.includes(characterGridY) && isVerticallyAlignedForTunnel) {
+                    if (this.y !== characterPixelYOnGrid) { 
+                         this.y = characterPixelYOnGrid;
+                    }
+                    if (this.x <= -TILE_SIZE && this.dx < 0) { 
+                        this.x = canvas.width - TILE_SIZE; 
+                    } else if (this.x >= canvas.width && this.dx > 0) { 
+                        this.x = 0; 
+                    }
+                }
+                this.eatPellet();
+            }
+            isWall(gridX, gridY, isTurning) { 
+                const x = Math.floor(gridX); const y = Math.floor(gridY);
+                const currentGridY = Math.floor(this.y / TILE_SIZE);
+                const isVerticallyAlignedEnough = Math.abs(this.y - (currentGridY * TILE_SIZE)) < this.speed;
+
+                if (TUNNEL_ROW_INDICES.includes(currentGridY) && isVerticallyAlignedEnough && !isTurning) { 
+                    if ((x < 0 && this.dx < 0) || (x >= MAZE_LAYOUT[0].length && this.dx > 0)) {
+                        return false; 
+                    }
+                }
+
+                if (y < 0 || y >= MAZE_LAYOUT.length || x < 0 || x >= MAZE_LAYOUT[0].length) return true; 
+                const tileType = MAZE_LAYOUT[y][x];
+                return tileType === 1 || tileType === 4; 
+            }
+            setDirection(dx, dy) { this.nextDx = dx; this.nextDy = dy; }
+            eatPellet() {
+                const gridX = Math.floor((this.x + TILE_SIZE / 2) / TILE_SIZE);
+                const gridY = Math.floor((this.y + TILE_SIZE / 2) / TILE_SIZE);
+                if (gridY >= 0 && gridY < maze.length && gridX >= 0 && gridX < maze[0].length) {
+                    const tile = maze[gridY][gridX]; 
+                    if (tile === 2 || tile === 3) { 
+                        maze[gridY][gridX] = 0; 
+                        pellets = pellets.filter(p => !(p.gridX === gridX && p.gridY === gridY));
+                        score += (tile === 2 ? 10 : 50); updateScoreboard();
+                        if (tile === 3) { 
+                            frightenedMode = true; frightenedTimer = FRIGHTENED_DURATION;
+                            ghosts.forEach(g => g.enterFrightenedMode());
+                        }
+                        if (pellets.length === 0) gameWon();
+                    }
+                }
+            }
+        }
+
+        class Ghost {
+            constructor(x, y, color) {
+                this.x = x; this.y = y; this.radius = TILE_SIZE / 2 - 3; 
+                this.speed = 1.8; // Ghosts are now faster
+                this.dx = 0; this.dy = -1; 
+                this.color = color; this.originalColor = color; this.frightenedColor = '#00f'; 
+                this.isFrightened = false; this.isEaten = false; this.eatenColor = '#aaa'; 
+                this.spawnX = x; this.spawnY = y;
+                this.isInsideHouse = true; 
+                this.doorTarget = { x: GHOST_DOOR_POS.x * TILE_SIZE, y: GHOST_DOOR_POS.y * TILE_SIZE };
+            }
+            draw() { 
+                let drawColor = this.originalColor;
+                if (this.isEaten) { drawColor = this.eatenColor;
+                } else if (this.isFrightened) {
+                    if (frightenedTimer < 2000 && Math.floor(frightenedTimer / 250) % 2 === 0) drawColor = '#fff';
+                    else drawColor = this.frightenedColor;
+                }
+                ctx.fillStyle = drawColor; ctx.beginPath();
+                ctx.arc(this.x + TILE_SIZE / 2, this.y + TILE_SIZE / 2, this.radius, Math.PI, 0);
+                const base = this.y + TILE_SIZE / 2 + this.radius;
+                ctx.lineTo(this.x + TILE_SIZE, base); ctx.lineTo(this.x + TILE_SIZE * 0.8, base - TILE_SIZE * 0.2);
+                ctx.lineTo(this.x + TILE_SIZE * 0.6, base); ctx.lineTo(this.x + TILE_SIZE * 0.4, base - TILE_SIZE * 0.2);
+                ctx.lineTo(this.x + TILE_SIZE * 0.2, base); ctx.lineTo(this.x, base); ctx.closePath(); ctx.fill();
+                if (!this.isEaten) {
+                    ctx.fillStyle = '#fff'; const eyeRadius = this.radius * 0.3; const eyeOffsetX = this.radius * 0.35; const eyeOffsetY = -this.radius * 0.05;
+                    ctx.beginPath(); ctx.arc(this.x + TILE_SIZE / 2 - eyeOffsetX, this.y + TILE_SIZE / 2 + eyeOffsetY, eyeRadius, 0, 2 * Math.PI);
+                    ctx.arc(this.x + TILE_SIZE / 2 + eyeOffsetX, this.y + TILE_SIZE / 2 + eyeOffsetY, eyeRadius, 0, 2 * Math.PI); ctx.fill();
+                    ctx.fillStyle = '#000'; const pupilRadius = eyeRadius * 0.5; let pDx = this.dx; let pDy = this.dy;
+                    if (this.isFrightened && Math.random() < 0.05) {pDx = Math.floor(Math.random()*3)-1; pDy = Math.floor(Math.random()*3)-1; if(pDx===0 && pDy===0)pDx=1;}
+                    const pOffsetX = pDx * pupilRadius * 0.6; const pOffsetY = pDy * pupilRadius * 0.6;
+                    ctx.beginPath(); ctx.arc(this.x + TILE_SIZE / 2 - eyeOffsetX + pOffsetX, this.y + TILE_SIZE / 2 + eyeOffsetY + pOffsetY, pupilRadius, 0, 2*Math.PI);
+                    ctx.arc(this.x + TILE_SIZE / 2 + eyeOffsetX + pOffsetX, this.y + TILE_SIZE / 2 + eyeOffsetY + pOffsetY, pupilRadius, 0, 2*Math.PI); ctx.fill();
+                } else {
+                    ctx.fillStyle = '#000'; const eyeR = this.radius*0.2; ctx.beginPath();
+                    ctx.arc(this.x+TILE_SIZE/2-eyeR, this.y+TILE_SIZE/2-eyeR*0.5, eyeR*0.7,0,2*Math.PI);
+                    ctx.arc(this.x+TILE_SIZE/2+eyeR, this.y+TILE_SIZE/2-eyeR*0.5, eyeR*0.7,0,2*Math.PI); ctx.fill();
+                }
+            }
+            update() {
+                const onGrid = (this.x % TILE_SIZE < this.speed && this.x % TILE_SIZE > -this.speed) && 
+                               (this.y % TILE_SIZE < this.speed && this.y % TILE_SIZE > -this.speed);
+                let targetPixelX, targetPixelY;
+
+                if (this.isEaten) {
+                    targetPixelX = this.spawnX; targetPixelY = this.spawnY;
+                    if (Math.abs(this.x - targetPixelX) < this.speed && Math.abs(this.y - targetPixelY) < this.speed) {
+                        this.x = targetPixelX; this.y = targetPixelY;
+                        this.isEaten = false; this.isInsideHouse = true; this.speed = 1.8; // Reset speed 
+                        this.dx = 0; this.dy = -1; 
+                        return; 
+                    }
+                } else if (this.isInsideHouse) {
+                    targetPixelX = this.doorTarget.x; targetPixelY = this.doorTarget.y;
+                    if (this.y <= targetPixelY && Math.abs(this.x - targetPixelX) < this.speed) {
+                         this.x = targetPixelX; this.y = targetPixelY; 
+                         this.isInsideHouse = false;
+                         this.dx = Math.random() < 0.5 ? -1 : 1; this.dy = 0;
+                         return;
+                    }
+                }
+                
+                if (onGrid) {
+                    if (this.isEaten || this.isInsideHouse) {
+                        const diffX = targetPixelX - this.x;
+                        const diffY = targetPixelY - this.y;
+                        let preferredDx = 0, preferredDy = 0;
+                        if (this.isInsideHouse && this.y > targetPixelY) preferredDy = -1;
+                        else if (Math.abs(diffY) > Math.abs(diffX) && diffY !== 0) preferredDy = Math.sign(diffY);
+                        else if (diffX !== 0) preferredDx = Math.sign(diffX);
+                        else if (diffY !== 0) preferredDy = Math.sign(diffY);
+                        
+                        if (preferredDy !== 0 && !this.isWall(this.x/TILE_SIZE, (this.y + preferredDy*TILE_SIZE)/TILE_SIZE, true)) { this.dx = 0; this.dy = preferredDy; } 
+                        else if (preferredDx !== 0 && !this.isWall((this.x + preferredDx*TILE_SIZE)/TILE_SIZE, this.y/TILE_SIZE, true)) { this.dx = preferredDx; this.dy = 0; } 
+                        else { 
+                            const availableMoves = [];
+                            if (!this.isWall(this.x/TILE_SIZE, (this.y - TILE_SIZE)/TILE_SIZE, true)) availableMoves.push({dx:0, dy:-1});
+                            if (!this.isWall(this.x/TILE_SIZE, (this.y + TILE_SIZE)/TILE_SIZE, true)) availableMoves.push({dx:0, dy:1});
+                            if (!this.isWall((this.x - TILE_SIZE)/TILE_SIZE, this.y/TILE_SIZE, true)) availableMoves.push({dx:-1, dy:0});
+                            if (!this.isWall((this.x + TILE_SIZE)/TILE_SIZE, this.y/TILE_SIZE, true)) availableMoves.push({dx:1, dy:0});
+                            if(availableMoves.length > 0){ const move = availableMoves[Math.floor(Math.random() * availableMoves.length)]; this.dx = move.dx; this.dy = move.dy; }
+                        }
+                    } else { 
+                        const possibleMoves = [];
+                        if (!this.isWall(this.x/TILE_SIZE, (this.y - TILE_SIZE)/TILE_SIZE, true) && this.dy !== 1) possibleMoves.push({dx:0, dy:-1});
+                        if (!this.isWall(this.x/TILE_SIZE, (this.y + TILE_SIZE)/TILE_SIZE, true) && this.dy !== -1) possibleMoves.push({dx:0, dy:1});
+                        if (!this.isWall((this.x - TILE_SIZE)/TILE_SIZE, this.y/TILE_SIZE, true) && this.dx !== 1) possibleMoves.push({dx:-1, dy:0});
+                        if (!this.isWall((this.x + TILE_SIZE)/TILE_SIZE, this.y/TILE_SIZE, true) && this.dx !== -1) possibleMoves.push({dx:1, dy:0});
+                        let chosenMoves = possibleMoves;
+                        if (!this.isFrightened) { 
+                            chosenMoves = possibleMoves.filter(m => !(m.dx === -this.dx && m.dy === -this.dy));
+                            if (chosenMoves.length === 0 && possibleMoves.length > 0) chosenMoves = possibleMoves;
+                        }
+                        if (chosenMoves.length > 0) { const move = chosenMoves[Math.floor(Math.random() * chosenMoves.length)]; this.dx = move.dx; this.dy = move.dy; }
+                    }
+                }
+
+                const currentActualSpeed = this.isFrightened && !this.isEaten ? this.speed * 0.65 : (this.isEaten ? this.speed * 2.5 : this.speed);
+                const nextX = this.x + this.dx * currentActualSpeed;
+                const nextY = this.y + this.dy * currentActualSpeed;
+                const currentTileX = Math.floor(this.x / TILE_SIZE);
+                const currentTileY = Math.floor(this.y / TILE_SIZE);
+
+                if (this.dx !== 0) { 
+                    const nextWallCheckX = Math.floor((nextX + (this.dx > 0 ? TILE_SIZE - 0.1 : 0.1)) / TILE_SIZE);
+                    if (!this.isWall(nextWallCheckX, currentTileY, false)) this.x = nextX;
+                    else { this.x = Math.round(this.x / TILE_SIZE) * TILE_SIZE; if(onGrid && !this.isEaten && !this.isInsideHouse) this.dx=0; } 
+                }
+                if (this.dy !== 0) { 
+                    const nextWallCheckY = Math.floor((nextY + (this.dy > 0 ? TILE_SIZE - 0.1 : 0.1)) / TILE_SIZE);
+                     if (!this.isWall(currentTileX, nextWallCheckY, false)) this.y = nextY;
+                    else { this.y = Math.round(this.y / TILE_SIZE) * TILE_SIZE; if(onGrid && !this.isEaten && !this.isInsideHouse) this.dy=0; } 
+                }
+
+                const characterGridY = Math.floor(this.y / TILE_SIZE);
+                const characterPixelYOnGrid = characterGridY * TILE_SIZE;
+                const isVerticallyAlignedForTunnel = (Math.abs(this.y - characterPixelYOnGrid) < this.speed);
+
+                if (TUNNEL_ROW_INDICES.includes(characterGridY) && isVerticallyAlignedForTunnel) {
+                     if (this.y !== characterPixelYOnGrid) { 
+                         this.y = characterPixelYOnGrid;
+                    }
+                    if (this.x <= -TILE_SIZE && this.dx < 0) { 
+                        this.x = canvas.width - TILE_SIZE; 
+                    } else if (this.x >= canvas.width && this.dx > 0) { 
+                        this.x = 0; 
+                    }
+                }
+            }
+            isWall(gridX, gridY, isTurning) { 
+                const x = Math.floor(gridX); const y = Math.floor(gridY);
+                const currentGhostGridY = Math.floor(this.y / TILE_SIZE);
+                const isVerticallyAlignedEnough = Math.abs(this.y - (currentGhostGridY * TILE_SIZE)) < this.speed;
+
+
+                if (TUNNEL_ROW_INDICES.includes(currentGhostGridY) && isVerticallyAlignedEnough && !isTurning) {
+                     if ((x < 0 && this.dx < 0) || (x >= MAZE_LAYOUT[0].length && this.dx > 0)) {
+                        return false; 
+                    }
+                }
+
+                if (y < 0 || y >= MAZE_LAYOUT.length || x < 0 || x >= MAZE_LAYOUT[0].length) return true;
+                const tileType = MAZE_LAYOUT[y][x];
+                if (tileType === 4 && !this.isEaten) return false; 
+                if (x === GHOST_DOOR_POS.x && y === GHOST_DOOR_POS.y && tileType === 0) return false; 
+                return tileType === 1; 
+            }
+            enterFrightenedMode() {
+                if (!this.isEaten) {
+                    this.isFrightened = true;
+                    const onGrid = (this.x % TILE_SIZE < this.speed && this.x % TILE_SIZE > -this.speed) && 
+                                   (this.y % TILE_SIZE < this.speed && this.y % TILE_SIZE > -this.speed);
+                    if (onGrid && (this.dx !== 0 || this.dy !== 0) && !this.isInsideHouse) {
+                       this.dx *= -1; this.dy *= -1;
+                    }
+                }
+            }
+            getEaten() {
+                if (this.isFrightened) { 
+                    this.isEaten = true; this.isFrightened = false; 
+                    score += 200 * (ghosts.filter(g => g.isEaten).length + 1); 
+                    updateScoreboard();
+                }
+            }
+        }
+
+        function initMaze() {
+            pellets = []; ghosts = [];  
+            const ghostColors = ['#f00', '#0ff', '#f8b', '#fa0']; 
+            let ghostSpawnCoords = []; 
+
+            for (let y = 0; y < MAZE_LAYOUT.length; y++) {
+                for (let x = 0; x < MAZE_LAYOUT[0].length; x++) {
+                    const tileType = MAZE_LAYOUT[y][x]; 
+                    if (tileType === 2) pellets.push({ x: x * TILE_SIZE + TILE_SIZE / 2, y: y * TILE_SIZE + TILE_SIZE / 2, type: 'normal', gridX: x, gridY: y });
+                    else if (tileType === 3) pellets.push({ x: x * TILE_SIZE + TILE_SIZE / 2, y: y * TILE_SIZE + TILE_SIZE / 2, type: 'power', gridX: x, gridY: y });
+                    else if (tileType === 5 && !pacman) pacman = new PacMan(x * TILE_SIZE, y * TILE_SIZE);
+                    else if (tileType === 4) ghostSpawnCoords.push({x: x * TILE_SIZE, y: y * TILE_SIZE});
+                }
+            }
+            ghostSpawnCoords.forEach((pos, index) => {
+                if (index < ghostColors.length) ghosts.push(new Ghost(pos.x, pos.y, ghostColors[index]));
+            });
+            for (let i = ghosts.length; i < ghostColors.length; i++) {
+                const spawnPos = ghostSpawnCoords.length > 0 ? ghostSpawnCoords[0] : {x: GHOST_DOOR_POS.x * TILE_SIZE, y: (GHOST_DOOR_POS.y + 1) * TILE_SIZE}; 
+                ghosts.push(new Ghost(spawnPos.x, spawnPos.y, ghostColors[i]));
+            }
+            if (!pacman) pacman = new PacMan(TILE_SIZE, TILE_SIZE); 
+        }
+
+        function drawMaze() { 
+            for (let y = 0; y < MAZE_LAYOUT.length; y++) { 
+                for (let x = 0; x < MAZE_LAYOUT[0].length; x++) {
+                    if (MAZE_LAYOUT[y][x] === 1) { 
+                        ctx.fillStyle = '#00f'; 
+                        ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                    }
+                }
+            }
+        }
+        function drawPellets() { 
+             pellets.forEach(pellet => { 
+                // Check the original MAZE_LAYOUT for pellet type to determine color
+                const originalTileType = MAZE_LAYOUT[pellet.gridY][pellet.gridX];
+                if (originalTileType === 3) { // Power pellet (was number 3)
+                    ctx.fillStyle = '#FFA500'; // Orange color for power pellets
+                } else {
+                    ctx.fillStyle = '#fff'; // White for normal pellets
+                }
+                ctx.beginPath();
+                const radius = originalTileType === 3 ? TILE_SIZE / 3 : TILE_SIZE / 6;
+                ctx.arc(pellet.x, pellet.y, radius, 0, 2 * Math.PI); ctx.fill();
+            });
+        }
+        function updateScoreboard() { scoreBoard.textContent = `Score: ${score}`; }
+        function updateLivesBoard() { livesBoard.textContent = `Lives: ${lives}`; }
+        function showMessage(title, text, buttonText, onButtonClick) {
+            messageTitle.textContent = title; messageText.innerHTML = text; messageButton.textContent = buttonText;
+            messageBox.style.display = 'block';
+            messageButton.onclick = () => { hideMessage(); if (onButtonClick) onButtonClick(); };
+        }
+        function hideMessage() { messageBox.style.display = 'none'; }
+        
+        function resetPlayerAndGhosts() { 
+            let pacmanSpawnX = TILE_SIZE, pacmanSpawnY = TILE_SIZE; 
+             for (let y = 0; y < MAZE_LAYOUT.length; y++) { 
+                for (let x = 0; x < MAZE_LAYOUT[0].length; x++) {
+                    if (MAZE_LAYOUT[y][x] === 5) { pacmanSpawnX = x * TILE_SIZE; pacmanSpawnY = y * TILE_SIZE; break; }
+                } if (MAZE_LAYOUT[y].includes(5)) break; 
+            }
+            pacman.x = pacmanSpawnX; pacman.y = pacmanSpawnY;
+            pacman.dx = 0; pacman.dy = 0; pacman.nextDx = 0; pacman.nextDy = 0; pacman.mouthAngle = 0.2 * Math.PI;
+
+            ghosts.forEach(g => {
+                g.x = g.spawnX; g.y = g.spawnY;
+                g.isFrightened = false; g.isEaten = false; g.isInsideHouse = true; 
+                g.dx = 0; g.dy = -1; 
+            });
+            frightenedMode = false; frightenedTimer = 0;
+        }
+
+        function checkCollisions() { 
+            ghosts.forEach(ghost => {
+                const distX = (pacman.x + TILE_SIZE / 2) - (ghost.x + TILE_SIZE / 2);
+                const distY = (pacman.y + TILE_SIZE / 2) - (ghost.y + TILE_SIZE / 2);
+                const distance = Math.sqrt(distX * distX + distY * distY);
+                if (distance < pacman.radius + ghost.radius - (TILE_SIZE * 0.2) ) { 
+                    if (ghost.isFrightened && !ghost.isEaten) { ghost.getEaten();
+                    } else if (!ghost.isEaten) { 
+                        lives--; updateLivesBoard(); gameRunning = false; 
+                        if (lives <= 0) { gameOver(); 
+                        } else {
+                            showMessage("Caught!", "Try again!", "OK", () => {
+                                resetPlayerAndGhosts(); gameRunning = true; requestAnimationFrame(gameLoop); 
+                            });
+                        }
+                    }
+                }
+            });
+        }
+        function initGame() { 
+            score = 0; lives = 3; updateScoreboard(); updateLivesBoard();
+            maze = JSON.parse(JSON.stringify(MAZE_LAYOUT)); 
+            initMaze(); resetPlayerAndGhosts(); hideMessage(); gameRunning = true; 
+        }
+        function gameOver() { 
+            gameRunning = false; finalScoreDisplay.textContent = score;
+            showMessage("Game Over", `Your final score: <span id="finalScore">${score}</span>`, "Restart", () => {
+                initGame(); requestAnimationFrame(gameLoop); 
+            });
+        }
+        function gameWon() { 
+            gameRunning = false; finalScoreDisplay.textContent = score;
+            showMessage("You Win!", `All pellets eaten! Score: <span id="finalScore">${score}</span>`, "Play Again", () => {
+                initGame(); requestAnimationFrame(gameLoop); 
+            });
+        }
+        
+        let lastTime = 0; const GHOST_UPDATE_INTERVAL = 110; let ghostUpdateTimer = 0;
+
+        function gameLoop(timestamp) { 
+            if (!gameRunning && lives > 0) { requestAnimationFrame(gameLoop); return; }
+            if (!gameRunning && lives <= 0) { requestAnimationFrame(gameLoop); return; }
+            const deltaTime = timestamp - lastTime; lastTime = timestamp;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawMaze(); drawPellets(); pacman.update(); pacman.draw();
+            ghostUpdateTimer += deltaTime;
+            if(ghostUpdateTimer >= GHOST_UPDATE_INTERVAL){ ghosts.forEach(ghost => ghost.update()); ghostUpdateTimer = 0; }
+            ghosts.forEach(ghost => ghost.draw());
+            if (gameRunning) checkCollisions();
+            if (frightenedMode) {
+                frightenedTimer -= deltaTime;
+                if (frightenedTimer <= 0) {
+                    frightenedMode = false;
+                    ghosts.forEach(g => { if (!g.isEaten) g.isFrightened = false; });
+                }
+            }
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.addEventListener('keydown', (e) => { 
+            if (!gameRunning && messageBox.style.display === 'none' && lives > 0) {
+                 if (e.key.startsWith("Arrow") || e.key === " ") { initGame(); requestAnimationFrame(gameLoop); }
+            }
+            if (!gameRunning) return; 
+            switch (e.key) {
+                case 'ArrowUp': case 'w': pacman.setDirection(0, -1); e.preventDefault(); break;
+                case 'ArrowDown': case 's': pacman.setDirection(0, 1); e.preventDefault(); break;
+                case 'ArrowLeft': case 'a': pacman.setDirection(-1, 0); e.preventDefault(); break;
+                case 'ArrowRight': case 'd': pacman.setDirection(1, 0); e.preventDefault(); break;
+            }
+        });
+        
+        const touchControlsDiv = document.getElementById('touchControls');
+        function isTouchDevice() { return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0); }
+        if (isTouchDevice()) { 
+            touchControlsDiv.style.display = 'grid';
+            const handleTouchStart = () => { if (!gameRunning && messageBox.style.display === 'none' && lives > 0) { initGame(); requestAnimationFrame(gameLoop); } };
+            document.getElementById('touchUp').addEventListener('click', () => { handleTouchStart(); if (gameRunning) pacman.setDirection(0, -1); });
+            document.getElementById('touchDown').addEventListener('click', () => { handleTouchStart(); if (gameRunning) pacman.setDirection(0, 1); });
+            document.getElementById('touchLeft').addEventListener('click', () => { handleTouchStart(); if (gameRunning) pacman.setDirection(-1, 0); });
+            document.getElementById('touchRight').addEventListener('click', () => { handleTouchStart(); if (gameRunning) pacman.setDirection(1, 0); });
+        }
+
+        resizeCanvas();
+        showMessage("Pac-Man", "Use Arrow Keys or Tap to Move. Eat all pellets!", "Start Game", () => {
+            initGame();
+            requestAnimationFrame(gameLoop);
+        });
+    </script>
+</body>
+</html>
