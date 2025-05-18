@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -19,7 +18,7 @@
             align-items: center;
             justify-content: center;
             font-family: 'Press Start 2P', cursive;
-            overflow: hidden;
+            overflow: hidden; /* Prevent scrollbars from appearing due to slight overflows */
         }
         #gameContainer {
             display: flex;
@@ -27,27 +26,31 @@
             align-items: center;
             justify-content: center;
             position: relative; /* For message box positioning */
+            width: 100%;
         }
         canvas {
             display: block;
             background-color: #000;
             border: 2px solid #00f; /* Blue border like classic Pac-Man */
-            max-width: 90vw;
-            max-height: 70vh;
+            max-width: 90vw; /* Ensure canvas doesn't exceed viewport width */
+            max-height: 65vh; /* Adjust height to leave space for info and controls */
             image-rendering: pixelated;
             image-rendering: -moz-crisp-edges;
             image-rendering: -webkit-optimize-contrast;
+            /* aspect-ratio will be handled by JS based on maze dimensions */
         }
         #gameInfo {
             width: 100%;
-            max-width: 500px; /* Match typical canvas width */
+            /* max-width will be set by JS to match canvas width */
             display: flex;
             justify-content: space-between;
-            padding: 10px 0;
+            padding: 10px 5px; /* Reduced padding slightly */
             font-size: 1rem;
+            box-sizing: border-box;
         }
-        #scoreBoard, #livesBoard {
+        #scoreBoard, #livesBoard, #levelBoard { /* Added levelBoard */
             color: #fff;
+            margin: 0 5px; /* Add some spacing between elements */
         }
         #messageBox {
             position: absolute;
@@ -56,29 +59,32 @@
             transform: translate(-50%, -50%);
             background-color: rgba(0, 0, 0, 0.9);
             color: #fff;
-            padding: 25px;
+            padding: 20px; /* Reduced padding */
             border: 2px solid #ff0; /* Yellow border */
             border-radius: 10px;
             text-align: center;
             z-index: 100;
             display: none; /* Hidden by default */
+            width: 80%;
+            max-width: 400px; /* Max width for message box */
         }
         #messageBox h1 {
-            font-size: 1.8rem;
+            font-size: 1.5rem; /* Adjusted font size */
             color: #ff0; /* Yellow title */
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
         #messageBox p {
-            font-size: 1rem;
-            margin-bottom: 20px;
+            font-size: 0.9rem; /* Adjusted font size */
+            margin-bottom: 15px;
+            line-height: 1.4;
         }
         #messageBox button {
             background-color: #ff0; /* Yellow button */
             color: #000;
             border: none;
-            padding: 10px 20px;
+            padding: 10px 15px;
             font-family: 'Press Start 2P', cursive;
-            font-size: 1rem;
+            font-size: 0.9rem; /* Adjusted font size */
             cursor: pointer;
             border-radius: 5px;
             transition: background-color 0.2s;
@@ -88,8 +94,8 @@
         }
 
         #touchControls {
-            display: none; /* Hidden by default */
-            margin-top: 15px;
+            display: none; /* Hidden by default, shown for touch devices */
+            margin-top: 10px;
             text-align: center;
         }
         #touchControls button {
@@ -97,22 +103,56 @@
             color: #fff;
             border: 1px solid #fff;
             font-family: 'Press Start 2P', cursive;
-            font-size: 1.5rem; /* Larger for touch */
-            padding: 10px;
-            margin: 5px;
-            min-width: 60px; /* Ensure decent tap area */
-            min-height: 60px;
+            font-size: 1.2rem; /* Adjusted for better fit */
+            padding: 8px; /* Adjusted padding */
+            margin: 3px; /* Adjusted margin */
+            min-width: 50px;
+            min-height: 50px;
             border-radius: 8px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
         }
-         @media (max-width: 600px) {
-            #gameInfo{ font-size: 0.8rem;}
-            #messageBox h1 { font-size: 1.5rem; }
-            #messageBox p { font-size: 0.9rem; }
-            #touchControls { display: grid; grid-template-columns: repeat(3, 1fr); width: 200px; gap:5px;}
+         @media (max-width: 600px) { /* More aggressive scaling for smaller screens */
+            #gameInfo{
+                font-size: 0.7rem;
+                padding: 5px 2px;
+            }
+            #messageBox h1 { font-size: 1.2rem; }
+            #messageBox p { font-size: 0.8rem; }
+            #messageBox button { font-size: 0.8rem; padding: 8px 12px;}
+
+            #touchControls {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                width: 180px; /* Smaller control pad */
+                gap:3px;
+            }
+            #touchControls button {
+                font-size: 1rem;
+                min-width: 45px;
+                min-height: 45px;
+                padding: 6px;
+            }
             #touchControls .up { grid-column: 2; }
             #touchControls .left { grid-column: 1; grid-row: 2; }
             #touchControls .right { grid-column: 3; grid-row: 2; }
             #touchControls .down { grid-column: 2; grid-row: 3; }
+        }
+        @media (orientation: landscape) and (max-height: 500px) {
+             canvas {
+                max-height: 80vh; /* Allow more height in landscape */
+             }
+             #gameInfo {
+                font-size: 0.8rem;
+             }
+             #touchControls {
+                margin-top: 5px;
+                width: 150px;
+             }
+             #touchControls button {
+                font-size: 0.9rem;
+                min-width: 40px;
+                min-height: 40px;
+             }
         }
     </style>
 </head>
@@ -120,7 +160,7 @@
     <div id="gameContainer">
         <div id="gameInfo">
             <div id="scoreBoard">Score: 0</div>
-            <div id="livesBoard">Lives: 3</div>
+            <div id="levelBoard">Level: 1</div> <div id="livesBoard">Lives: 3</div>
         </div>
         <canvas id="gameCanvas"></canvas>
         <div id="messageBox">
@@ -137,499 +177,969 @@
     </div>
 
     <script>
+        // Game DOM Elements
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const scoreBoard = document.getElementById('scoreBoard');
         const livesBoard = document.getElementById('livesBoard');
+        const levelBoard = document.getElementById('levelBoard');
         const finalScoreDisplay = document.getElementById('finalScore');
         const messageBox = document.getElementById('messageBox');
         const messageTitle = document.getElementById('messageTitle');
         const messageText = document.getElementById('messageText');
-        const messageButton = document.getElementById('messageButton');
+        let messageButton = document.getElementById('messageButton'); // Changed const to let
 
+        // Game Constants and Variables
         const TILE_SIZE = 20; // Size of each tile in the maze
-        let maze; // This will be the mutable copy of MAZE_LAYOUT for pellets
+        let currentMazeLayout; // Holds the layout for the current level (the array of numbers)
+        let mutableMaze; // Mutable copy of currentMazeLayout for tracking eaten pellets
         let pacman;
         let ghosts = [];
-        let pellets = [];
+        let pellets = []; // Array of pellet objects {x, y, type, gridX, gridY}
         let score = 0;
         let lives = 3;
         let gameRunning = false;
-        let frightenedMode = false;
-        let frightenedTimer = 0;
+        let frightenedMode = false; // Is Pac-Man powered up?
+        let frightenedTimer = 0; // How long power-up lasts
         const FRIGHTENED_DURATION = 7000; // 7 seconds
+        let currentLevelIndex = 0; // Start at level 1 (index 0)
 
-        // Updated MAZE_LAYOUT as per user request
-        const MAZE_LAYOUT = [ 
-            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1],
-            [1,3,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,3,1],
-            [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
-            [1,2,1,1,2,1,1,1,2,2,2,1,1,1,2,1,1,2,1], // User's provided maze
-            [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
-            [1,2,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,2,1],
-            [1,2,2,2,2,1,2,2,2,2,2,2,2,1,2,2,2,2,1],
-            [1,1,1,1,2,1,1,1,1,2,1,1,1,1,2,1,1,1,1], 
-            [1,1,1,1,2,1,1,1,4,2,2,2,2,2,2,1,0,0,0], 
-            [1,1,1,1,2,1,1,1,1,2,1,1,1,1,2,1,1,1,1], 
-            [2,2,2,2,2,1,2,2,2,2,0,1,0,2,2,2,2,2,2], 
-            [1,1,1,1,2,1,0,1,1,1,1,1,0,1,2,1,1,1,1], 
-            [2,2,2,2,2,1,0,0,2,5,0,0,0,1,2,2,2,2,2], 
-            [1,1,1,1,2,1,0,1,2,1,1,1,0,1,2,1,1,1,1], 
-            [2,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,2],
-            [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
-            [1,2,2,1,2,2,2,2,2,2,2,2,2,2,2,1,2,2,1],
-            [1,1,2,1,2,1,2,1,1,1,1,1,2,1,2,1,2,1,1],
-            [1,3,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,3,1],
-            [1,2,1,1,1,1,1,1,2,1,2,1,1,1,1,1,1,2,1],
-            [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
-            [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1]
-        ];
-        // Updated TUNNEL_ROW_INDICES based on the new MAZE_LAYOUT
-        const TUNNEL_ROW_INDICES = [10, 12, 14]; 
-        const GHOST_DOOR_POS = { x: 9, y: 7 }; // Grid coordinates of the ghost house door (MAZE_LAYOUT[7][9] is the door tile 0)
+        // --- MAZE DEFINITIONS ---
+        // MAZE_LAYOUT_LEVEL_1: Original maze configuration
+        const MAZE_LAYOUT_LEVEL_1 = {
+            layout: [
+                [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1],
+                [1,3,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,3,1],
+                [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
+                [1,2,1,1,2,1,1,1,2,2,2,1,1,1,2,1,1,2,1],
+                [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+                [1,2,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,2,1],
+                [1,2,2,2,2,1,2,2,2,2,2,2,2,1,2,2,2,2,1],
+                [1,1,1,1,2,1,1,1,1,2,1,1,1,1,2,1,1,1,1],
+                [1,1,1,1,2,1,1,1,4,2,2,2,2,2,2,1,0,0,0], // Ghost house (4), door (0), path (2)
+                [1,1,1,1,2,1,1,1,1,2,1,1,1,1,2,1,1,1,1],
+                [2,2,2,2,2,1,2,2,2,2,0,1,0,2,2,2,2,2,2], // Tunnel row
+                [1,1,1,1,2,1,0,1,1,1,1,1,0,1,2,1,1,1,1],
+                [2,2,2,2,2,1,0,0,2,5,0,0,0,1,2,2,2,2,2], // Pacman start (5), Tunnel row
+                [1,1,1,1,2,1,0,1,2,1,1,1,0,1,2,1,1,1,1],
+                [2,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,2], // Tunnel row
+                [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
+                [1,2,2,1,2,2,2,2,2,2,2,2,2,2,2,1,2,2,1],
+                [1,1,2,1,2,1,2,1,1,1,1,1,2,1,2,1,2,1,1],
+                [1,3,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,3,1],
+                [1,2,1,1,1,1,1,1,2,1,2,1,1,1,1,1,1,2,1],
+                [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+                [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1]
+            ],
+            tunnelRows: [10, 12, 14], // Row indices (0-based) that contain tunnels
+            ghostDoorPos: { x: 9, y: 7 } // Grid coordinates of the ghost house door (tile type 0)
+        };
+
+        // --------------- START: PASTE YOUR LEVEL 2 MAZE ARRAY HERE ---------------
+        // IMPORTANT: Replace the 'layout', 'tunnelRows', and 'ghostDoorPos' with your actual Level 2 data.
+        // The example layout below is a placeholder and likely does NOT match lev2maze.png.
+        // Ensure the number of columns is consistent for every row in your 'layout'.
+        // The image 'lev2maze.png' looks roughly 28 tiles high and 25 tiles wide.
+        // Legend: 1=wall, 2=pellet, 3=power pellet, 4=ghost spawn area, 5=pacman start, 0=empty path/ghost door.
+        const MAZE_LAYOUT_LEVEL_2 = {
+            layout: [ // THIS IS A PLACEHOLDER - REPLACE IT!
+                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+                [1,5,2,2,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,2,2,3,1],
+                [1,2,1,1,1,2,1,1,1,1,1,2,1,2,1,1,1,1,1,2,1,1,1,2,1],
+                [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+                [1,2,1,1,1,2,1,2,1,1,1,1,1,1,1,1,1,2,1,2,1,1,1,2,1],
+                [1,2,2,2,2,2,1,2,2,2,2,2,1,2,2,2,2,2,1,2,2,2,2,2,1],
+                [1,1,1,1,1,2,1,1,1,2,1,2,1,2,1,2,1,1,1,2,1,1,1,1,1],
+                [0,0,0,0,1,2,1,2,2,2,1,2,1,2,1,2,2,2,1,2,1,0,0,0,0], // Example Tunnel Row
+                [1,1,1,1,1,2,1,2,1,1,1,0,0,0,1,1,1,2,1,2,1,1,1,1,1],
+                [1,2,2,2,2,2,2,2,1,4,4,4,4,4,4,1,2,2,2,2,2,2,2,2,1],
+                [1,2,1,1,1,2,1,2,1,4,1,1,0,1,1,4,1,2,1,2,1,1,1,2,1], // Ghost door (0)
+                [1,2,1,1,1,2,1,2,1,4,1,2,2,2,1,4,1,2,1,2,1,1,1,2,1],
+                [1,2,2,2,2,2,1,2,1,4,4,4,4,4,4,1,2,1,2,2,2,2,2,2,1],
+                [1,1,1,1,1,2,1,2,1,1,1,1,1,1,1,1,1,2,1,2,1,1,1,1,1],
+                [1,2,2,2,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,2,2,2,1],
+                [1,2,1,1,1,2,1,1,1,1,1,2,1,2,1,1,1,1,1,2,1,1,1,2,1],
+                [1,3,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,3,1],
+                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+            ],
+            tunnelRows: [7], // EXAMPLE: Row 7 is a tunnel. ADJUST TO YOUR MAZE!
+            ghostDoorPos: { x: 12, y: 10 } // EXAMPLE: Door at (12,10). ADJUST TO YOUR MAZE!
+        };
+        // --------------- END: PASTE YOUR LEVEL 2 MAZE ARRAY HERE ---------------
+
+        const allMazeConfigs = [MAZE_LAYOUT_LEVEL_1, MAZE_LAYOUT_LEVEL_2];
+        let currentTunnelRows; // Will be set by loadLevelConfig
+        let currentGhostDoorPos; // Will be set by loadLevelConfig
 
 
-        function resizeCanvas() {
-            const mazeHeight = MAZE_LAYOUT.length * TILE_SIZE;
-            const mazeWidth = MAZE_LAYOUT[0].length * TILE_SIZE;
-            canvas.width = mazeWidth;
-            canvas.height = mazeHeight;
-            const gameInfo = document.getElementById('gameInfo');
-            if (gameInfo) gameInfo.style.maxWidth = `${mazeWidth}px`;
+        /**
+         * Loads the configuration for a specific level.
+         * @param {number} levelIndex - The 0-based index of the level to load.
+         * @returns {boolean} True if the level was loaded successfully, false otherwise.
+         */
+        function loadLevelConfig(levelIndex) {
+            if (levelIndex >= allMazeConfigs.length) {
+                console.warn("Attempted to load invalid level index:", levelIndex);
+                return false; // No more levels
+            }
+            const config = allMazeConfigs[levelIndex];
+            currentMazeLayout = config.layout;
+            currentTunnelRows = config.tunnelRows || []; // Default to empty array if not defined
+            currentGhostDoorPos = config.ghostDoorPos;
+
+            // Validate essential configurations
+            if (!currentMazeLayout || currentMazeLayout.length === 0 || !currentMazeLayout[0] || currentMazeLayout[0].length === 0) {
+                console.error("Maze layout is invalid for level:", levelIndex, currentMazeLayout);
+                showMessage("Error", "Failed to load level data.<br>Maze layout is invalid.", "Restart", () => initGame(true));
+                return false;
+            }
+            if (!currentGhostDoorPos || typeof currentGhostDoorPos.x !== 'number' || typeof currentGhostDoorPos.y !== 'number') {
+                console.error("Ghost door position not properly defined for level:", levelIndex);
+                // Fallback: try to find a '0' tile, or place near center. This is a last resort.
+                let foundDoor = false;
+                for (let r = 0; r < currentMazeLayout.length; r++) {
+                    for (let c = 0; c < currentMazeLayout[0].length; c++) {
+                        if (currentMazeLayout[r][c] === 0) {
+                            currentGhostDoorPos = { x: c, y: r };
+                            foundDoor = true; break;
+                        }
+                    }
+                    if (foundDoor) break;
+                }
+                if (!foundDoor) currentGhostDoorPos = { x: Math.floor(currentMazeLayout[0].length / 2) , y: Math.floor(currentMazeLayout.length / 2) -1 };
+                console.warn("Using fallback ghost door position:", currentGhostDoorPos);
+            }
+            return true;
         }
 
+        /**
+         * Resizes the canvas and game info bar to fit the current maze dimensions.
+         */
+        function resizeCanvas() {
+            if (!currentMazeLayout || currentMazeLayout.length === 0 || !currentMazeLayout[0] || currentMazeLayout[0].length === 0) {
+                console.warn("Cannot resize canvas, maze layout is not ready.");
+                return;
+            }
+            const mazePixelWidth = currentMazeLayout[0].length * TILE_SIZE;
+            const mazePixelHeight = currentMazeLayout.length * TILE_SIZE;
+
+            canvas.width = mazePixelWidth;
+            canvas.height = mazePixelHeight;
+
+            // Style the canvas to fit within max-width/max-height CSS rules while maintaining aspect ratio
+            const containerWidth = document.getElementById('gameContainer').clientWidth * 0.9; // 90vw
+            const containerHeight = window.innerHeight * 0.65; // 65vh (max-height of canvas)
+
+            const scale = Math.min(containerWidth / mazePixelWidth, containerHeight / mazePixelHeight, 1);
+
+            canvas.style.width = (mazePixelWidth * scale) + 'px';
+            canvas.style.height = (mazePixelHeight * scale) + 'px';
+
+
+            const gameInfo = document.getElementById('gameInfo');
+            if (gameInfo) {
+                gameInfo.style.width = (mazePixelWidth * scale) + 'px'; // Match canvas scaled width
+                gameInfo.style.maxWidth = (mazePixelWidth * scale) + 'px';
+            }
+        }
+        window.addEventListener('resize', resizeCanvas); // Resize when window size changes
+
+        /**
+         * PacMan class representing the player.
+         */
         class PacMan {
             constructor(x, y) {
-                this.x = x; this.y = y; this.radius = TILE_SIZE / 2 - 2; this.speed = 2; 
-                this.dx = 0; this.dy = 0; this.nextDx = 0; this.nextDy = 0;
-                this.mouthOpen = true; this.mouthAngle = 0.2 * Math.PI; this.mouthSpeed = 0.05 * Math.PI; 
-                this.color = '#ff0'; 
+                this.x = x; // Pixel position
+                this.y = y; // Pixel position
+                this.spawnX = x; // For resetting position
+                this.spawnY = y;
+                this.radius = TILE_SIZE / 2 - 2;
+                this.speed = 2;
+                this.dx = 0; // Direction x (-1, 0, 1)
+                this.dy = 0; // Direction y (-1, 0, 1)
+                this.nextDx = 0; // Buffered next direction
+                this.nextDy = 0;
+                this.mouthOpen = true;
+                this.mouthAngle = 0.2 * Math.PI;
+                this.mouthSpeed = 0.05 * Math.PI;
+                this.color = '#ff0'; // Yellow
             }
+
             draw() {
-                ctx.fillStyle = this.color; ctx.beginPath();
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                // Determine facing angle for mouth
                 const angle = (this.dx === 0 && this.dy === 0 && this.nextDx === 0 && this.nextDy === 0) ? 0 : Math.atan2(this.dy || this.nextDy, this.dx || this.nextDx);
                 ctx.arc(this.x + TILE_SIZE / 2, this.y + TILE_SIZE / 2, this.radius, angle + this.mouthAngle, angle - this.mouthAngle);
-                ctx.lineTo(this.x + TILE_SIZE / 2, this.y + TILE_SIZE / 2); ctx.fill();
-                if (this.mouthOpen) { this.mouthAngle += this.mouthSpeed; if (this.mouthAngle >= 0.4 * Math.PI) this.mouthOpen = false; } 
-                else { this.mouthAngle -= this.mouthSpeed; if (this.mouthAngle <= 0.05 * Math.PI) this.mouthOpen = true; }
+                ctx.lineTo(this.x + TILE_SIZE / 2, this.y + TILE_SIZE / 2);
+                ctx.fill();
+
+                // Animate mouth
+                if (this.mouthOpen) {
+                    this.mouthAngle += this.mouthSpeed;
+                    if (this.mouthAngle >= 0.4 * Math.PI) this.mouthOpen = false;
+                } else {
+                    this.mouthAngle -= this.mouthSpeed;
+                    if (this.mouthAngle <= 0.05 * Math.PI) this.mouthOpen = true;
+                }
             }
+
             update() {
                 const onGridXStrict = (this.x % TILE_SIZE === 0);
                 const onGridYStrict = (this.y % TILE_SIZE === 0);
 
+                // Try to apply buffered direction change if aligned with grid
                 if (this.nextDx !== 0 || this.nextDy !== 0) {
-                    if (this.nextDx !== 0 && onGridYStrict) {
+                    if (this.nextDx !== 0 && onGridYStrict) { // Turning horizontally
                         const checkY = this.y / TILE_SIZE;
-                        const checkX = Math.floor((this.x + this.nextDx * TILE_SIZE ) / TILE_SIZE);
-                        if (!this.isWall(checkX, checkY, true)) { 
-                            this.dx = this.nextDx; this.dy = 0; this.nextDx = 0; this.nextDy = 0;
+                        const checkX = Math.floor((this.x + this.nextDx * TILE_SIZE) / TILE_SIZE); // Check tile in new direction
+                        if (!this.isWall(checkX, checkY, true)) {
+                            this.dx = this.nextDx; this.dy = 0;
+                            this.nextDx = 0; this.nextDy = 0;
                         }
-                    } else if (this.nextDy !== 0 && onGridXStrict) {
+                    } else if (this.nextDy !== 0 && onGridXStrict) { // Turning vertically
                         const checkX = this.x / TILE_SIZE;
-                        const checkY = Math.floor((this.y + this.nextDy * TILE_SIZE ) / TILE_SIZE);
-                        if (!this.isWall(checkX, checkY, true)) { 
-                            this.dx = 0; this.dy = this.nextDy; this.nextDx = 0; this.nextDy = 0;
+                        const checkY = Math.floor((this.y + this.nextDy * TILE_SIZE) / TILE_SIZE); // Check tile in new direction
+                        if (!this.isWall(checkX, checkY, true)) {
+                            this.dx = 0; this.dy = this.nextDy;
+                            this.nextDx = 0; this.nextDy = 0;
                         }
                     }
                 }
 
+                // Calculate target position
                 const targetX = this.x + this.dx * this.speed;
                 const targetY = this.y + this.dy * this.speed;
                 const currentTileX = Math.floor(this.x / TILE_SIZE);
                 const currentTileY = Math.floor(this.y / TILE_SIZE);
-                
+
+                // Move horizontally
                 if (this.dx !== 0) {
                     const nextWallCheckX = Math.floor((targetX + (this.dx > 0 ? TILE_SIZE - 0.1 : 0.1)) / TILE_SIZE);
-                    if (!this.isWall(nextWallCheckX, currentTileY, false)) this.x = targetX; 
-                    else this.x = Math.round(this.x / TILE_SIZE) * TILE_SIZE;
+                    if (!this.isWall(nextWallCheckX, currentTileY, false)) {
+                        this.x = targetX;
+                    } else { // Hit a wall
+                        this.x = Math.round(this.x / TILE_SIZE) * TILE_SIZE; // Snap to grid
+                    }
                 }
+                // Move vertically
                 if (this.dy !== 0) {
                     const nextWallCheckY = Math.floor((targetY + (this.dy > 0 ? TILE_SIZE - 0.1 : 0.1)) / TILE_SIZE);
-                    if (!this.isWall(currentTileX, nextWallCheckY, false)) this.y = targetY; 
-                    else this.y = Math.round(this.y / TILE_SIZE) * TILE_SIZE;
+                    if (!this.isWall(currentTileX, nextWallCheckY, false)) {
+                        this.y = targetY;
+                    } else { // Hit a wall
+                        this.y = Math.round(this.y / TILE_SIZE) * TILE_SIZE; // Snap to grid
+                    }
                 }
-                
+
+                // Tunnel logic
                 const characterGridY = Math.floor(this.y / TILE_SIZE);
                 const characterPixelYOnGrid = characterGridY * TILE_SIZE;
                 const isVerticallyAlignedForTunnel = (Math.abs(this.y - characterPixelYOnGrid) < this.speed);
 
+                if (currentTunnelRows.includes(characterGridY) && isVerticallyAlignedForTunnel) {
+                    if (this.y !== characterPixelYOnGrid) this.y = characterPixelYOnGrid; // Snap to tunnel row Y
 
-                if (TUNNEL_ROW_INDICES.includes(characterGridY) && isVerticallyAlignedForTunnel) {
-                    if (this.y !== characterPixelYOnGrid) { 
-                         this.y = characterPixelYOnGrid;
-                    }
-                    if (this.x <= -TILE_SIZE && this.dx < 0) { 
-                        this.x = canvas.width - TILE_SIZE; 
-                    } else if (this.x >= canvas.width && this.dx > 0) { 
-                        this.x = 0; 
-                    }
+                    if (this.x <= -TILE_SIZE && this.dx < 0) this.x = canvas.width - TILE_SIZE; // Wrap left
+                    else if (this.x >= canvas.width && this.dx > 0) this.x = 0; // Wrap right
                 }
                 this.eatPellet();
             }
-            isWall(gridX, gridY, isTurning) { 
-                const x = Math.floor(gridX); const y = Math.floor(gridY);
+
+            /**
+             * Checks if a given grid coordinate is a wall.
+             * @param {number} gridX - The X grid coordinate.
+             * @param {number} gridY - The Y grid coordinate.
+             * @param {boolean} isTurning - True if this check is for a potential turn.
+             * @returns {boolean} True if it's a wall, false otherwise.
+             */
+            isWall(gridX, gridY, isTurning) {
+                const x = Math.floor(gridX);
+                const y = Math.floor(gridY);
+
+                // Tunnel passthrough logic
                 const currentGridY = Math.floor(this.y / TILE_SIZE);
                 const isVerticallyAlignedEnough = Math.abs(this.y - (currentGridY * TILE_SIZE)) < this.speed;
-
-                if (TUNNEL_ROW_INDICES.includes(currentGridY) && isVerticallyAlignedEnough && !isTurning) { 
-                    if ((x < 0 && this.dx < 0) || (x >= MAZE_LAYOUT[0].length && this.dx > 0)) {
-                        return false; 
+                if (currentTunnelRows.includes(currentGridY) && isVerticallyAlignedEnough && !isTurning) {
+                    if ((x < 0 && this.dx < 0) || (x >= currentMazeLayout[0].length && this.dx > 0)) {
+                        return false; // Allow passing through actual tunnel openings
                     }
                 }
 
-                if (y < 0 || y >= MAZE_LAYOUT.length || x < 0 || x >= MAZE_LAYOUT[0].length) return true; 
-                const tileType = MAZE_LAYOUT[y][x];
-                return tileType === 1 || tileType === 4; 
+                // Bounds check
+                if (y < 0 || y >= currentMazeLayout.length || x < 0 || x >= currentMazeLayout[0].length) return true;
+
+                const tileType = currentMazeLayout[y][x];
+                return tileType === 1 || tileType === 4; // Wall (1) or solid part of Ghost House (4)
             }
-            setDirection(dx, dy) { this.nextDx = dx; this.nextDy = dy; }
+
+            setDirection(dx, dy) {
+                this.nextDx = dx;
+                this.nextDy = dy;
+            }
+
             eatPellet() {
                 const gridX = Math.floor((this.x + TILE_SIZE / 2) / TILE_SIZE);
                 const gridY = Math.floor((this.y + TILE_SIZE / 2) / TILE_SIZE);
-                if (gridY >= 0 && gridY < maze.length && gridX >= 0 && gridX < maze[0].length) {
-                    const tile = maze[gridY][gridX]; 
-                    if (tile === 2 || tile === 3) { 
-                        maze[gridY][gridX] = 0; 
-                        pellets = pellets.filter(p => !(p.gridX === gridX && p.gridY === gridY));
-                        score += (tile === 2 ? 10 : 50); updateScoreboard();
-                        if (tile === 3) { 
-                            frightenedMode = true; frightenedTimer = FRIGHTENED_DURATION;
+
+                if (gridY >= 0 && gridY < mutableMaze.length && gridX >= 0 && gridX < mutableMaze[0].length) {
+                    const tile = mutableMaze[gridY][gridX];
+                    if (tile === 2 || tile === 3) { // Pellet or Power Pellet
+                        mutableMaze[gridY][gridX] = 0; // Mark as eaten in the mutable maze
+                        pellets = pellets.filter(p => !(p.gridX === gridX && p.gridY === gridY)); // Remove from pellets array
+                        score += (tile === 2 ? 10 : 50);
+                        updateScoreboard();
+
+                        if (tile === 3) { // Power Pellet
+                            frightenedMode = true;
+                            frightenedTimer = FRIGHTENED_DURATION;
                             ghosts.forEach(g => g.enterFrightenedMode());
                         }
-                        if (pellets.length === 0) gameWon();
+                        if (pellets.length === 0) gameWon(); // All pellets eaten
                     }
                 }
             }
         }
 
+        /**
+         * Ghost class.
+         */
         class Ghost {
             constructor(x, y, color) {
-                this.x = x; this.y = y; this.radius = TILE_SIZE / 2 - 3; 
-                this.speed = 1.8; // Ghosts are now faster
-                this.dx = 0; this.dy = -1; 
-                this.color = color; this.originalColor = color; this.frightenedColor = '#00f'; 
-                this.isFrightened = false; this.isEaten = false; this.eatenColor = '#aaa'; 
+                this.x = x; this.y = y;
                 this.spawnX = x; this.spawnY = y;
-                this.isInsideHouse = true; 
-                this.doorTarget = { x: GHOST_DOOR_POS.x * TILE_SIZE, y: GHOST_DOOR_POS.y * TILE_SIZE };
+                this.radius = TILE_SIZE / 2 - 3;
+                this.speed = 1.8; // Slightly slower than Pac-Man initially
+                this.dx = 0; this.dy = -1; // Default: try to move up first (e.g. out of house)
+                this.color = color; this.originalColor = color;
+                this.frightenedColor = '#00f'; // Blue when frightened
+                this.isFrightened = false;
+                this.isEaten = false;
+                this.eatenColor = '#aaa'; // Grey when eaten
+                this.isInsideHouse = true;
+                this.doorTarget = { x: currentGhostDoorPos.x * TILE_SIZE, y: currentGhostDoorPos.y * TILE_SIZE };
             }
-            draw() { 
+
+            draw() {
                 let drawColor = this.originalColor;
-                if (this.isEaten) { drawColor = this.eatenColor;
+                if (this.isEaten) {
+                    drawColor = this.eatenColor;
                 } else if (this.isFrightened) {
-                    if (frightenedTimer < 2000 && Math.floor(frightenedTimer / 250) % 2 === 0) drawColor = '#fff';
-                    else drawColor = this.frightenedColor;
+                    // Flashing effect when frightened mode is about to end
+                    if (frightenedTimer < 2000 && Math.floor(frightenedTimer / 250) % 2 === 0) {
+                        drawColor = '#fff'; // White flash
+                    } else {
+                        drawColor = this.frightenedColor;
+                    }
                 }
-                ctx.fillStyle = drawColor; ctx.beginPath();
+                ctx.fillStyle = drawColor;
+                ctx.beginPath();
+                // Ghost body (arc top, rectangular bottom with wavy edges)
                 ctx.arc(this.x + TILE_SIZE / 2, this.y + TILE_SIZE / 2, this.radius, Math.PI, 0);
                 const base = this.y + TILE_SIZE / 2 + this.radius;
-                ctx.lineTo(this.x + TILE_SIZE, base); ctx.lineTo(this.x + TILE_SIZE * 0.8, base - TILE_SIZE * 0.2);
-                ctx.lineTo(this.x + TILE_SIZE * 0.6, base); ctx.lineTo(this.x + TILE_SIZE * 0.4, base - TILE_SIZE * 0.2);
-                ctx.lineTo(this.x + TILE_SIZE * 0.2, base); ctx.lineTo(this.x, base); ctx.closePath(); ctx.fill();
+                ctx.lineTo(this.x + TILE_SIZE, base); // Bottom-right corner
+                // Wavy bottom
+                ctx.lineTo(this.x + TILE_SIZE * 0.8, base - TILE_SIZE * 0.2);
+                ctx.lineTo(this.x + TILE_SIZE * 0.6, base);
+                ctx.lineTo(this.x + TILE_SIZE * 0.4, base - TILE_SIZE * 0.2);
+                ctx.lineTo(this.x + TILE_SIZE * 0.2, base);
+                ctx.lineTo(this.x, base); // Bottom-left corner
+                ctx.closePath();
+                ctx.fill();
+
+                // Eyes
                 if (!this.isEaten) {
-                    ctx.fillStyle = '#fff'; const eyeRadius = this.radius * 0.3; const eyeOffsetX = this.radius * 0.35; const eyeOffsetY = -this.radius * 0.05;
-                    ctx.beginPath(); ctx.arc(this.x + TILE_SIZE / 2 - eyeOffsetX, this.y + TILE_SIZE / 2 + eyeOffsetY, eyeRadius, 0, 2 * Math.PI);
-                    ctx.arc(this.x + TILE_SIZE / 2 + eyeOffsetX, this.y + TILE_SIZE / 2 + eyeOffsetY, eyeRadius, 0, 2 * Math.PI); ctx.fill();
-                    ctx.fillStyle = '#000'; const pupilRadius = eyeRadius * 0.5; let pDx = this.dx; let pDy = this.dy;
-                    if (this.isFrightened && Math.random() < 0.05) {pDx = Math.floor(Math.random()*3)-1; pDy = Math.floor(Math.random()*3)-1; if(pDx===0 && pDy===0)pDx=1;}
-                    const pOffsetX = pDx * pupilRadius * 0.6; const pOffsetY = pDy * pupilRadius * 0.6;
-                    ctx.beginPath(); ctx.arc(this.x + TILE_SIZE / 2 - eyeOffsetX + pOffsetX, this.y + TILE_SIZE / 2 + eyeOffsetY + pOffsetY, pupilRadius, 0, 2*Math.PI);
-                    ctx.arc(this.x + TILE_SIZE / 2 + eyeOffsetX + pOffsetX, this.y + TILE_SIZE / 2 + eyeOffsetY + pOffsetY, pupilRadius, 0, 2*Math.PI); ctx.fill();
-                } else {
+                    ctx.fillStyle = '#fff'; // White part of eyes
+                    const eyeRadius = this.radius * 0.3;
+                    const eyeOffsetX = this.radius * 0.35;
+                    const eyeOffsetY = -this.radius * 0.05;
+                    ctx.beginPath();
+                    ctx.arc(this.x + TILE_SIZE / 2 - eyeOffsetX, this.y + TILE_SIZE / 2 + eyeOffsetY, eyeRadius, 0, 2 * Math.PI);
+                    ctx.arc(this.x + TILE_SIZE / 2 + eyeOffsetX, this.y + TILE_SIZE / 2 + eyeOffsetY, eyeRadius, 0, 2 * Math.PI);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#000'; // Pupils
+                    const pupilRadius = eyeRadius * 0.5;
+                    let pDx = this.dx; let pDy = this.dy; // Pupil direction based on ghost movement
+                    // Random pupil movement when frightened
+                    if (this.isFrightened && Math.random() < 0.05) {
+                        pDx = Math.floor(Math.random()*3)-1; pDy = Math.floor(Math.random()*3)-1;
+                        if(pDx===0 && pDy===0) pDx=1; // Ensure some movement
+                    }
+                    const pOffsetX = pDx * pupilRadius * 0.6;
+                    const pOffsetY = pDy * pupilRadius * 0.6;
+                    ctx.beginPath();
+                    ctx.arc(this.x + TILE_SIZE / 2 - eyeOffsetX + pOffsetX, this.y + TILE_SIZE / 2 + eyeOffsetY + pOffsetY, pupilRadius, 0, 2*Math.PI);
+                    ctx.arc(this.x + TILE_SIZE / 2 + eyeOffsetX + pOffsetX, this.y + TILE_SIZE / 2 + eyeOffsetY + pOffsetY, pupilRadius, 0, 2*Math.PI);
+                    ctx.fill();
+                } else { // Simple "eaten" eyes (just pupils returning to base)
                     ctx.fillStyle = '#000'; const eyeR = this.radius*0.2; ctx.beginPath();
                     ctx.arc(this.x+TILE_SIZE/2-eyeR, this.y+TILE_SIZE/2-eyeR*0.5, eyeR*0.7,0,2*Math.PI);
                     ctx.arc(this.x+TILE_SIZE/2+eyeR, this.y+TILE_SIZE/2-eyeR*0.5, eyeR*0.7,0,2*Math.PI); ctx.fill();
                 }
             }
-            update() {
-                const onGrid = (this.x % TILE_SIZE < this.speed && this.x % TILE_SIZE > -this.speed) && 
-                               (this.y % TILE_SIZE < this.speed && this.y % TILE_SIZE > -this.speed);
-                let targetPixelX, targetPixelY;
 
-                if (this.isEaten) {
+            update() {
+                // Snapping to grid helps with more predictable turning and pathfinding
+                const onGrid = (Math.abs(this.x % TILE_SIZE) < this.speed && Math.abs(this.x % TILE_SIZE) > -this.speed) &&
+                               (Math.abs(this.y % TILE_SIZE) < this.speed && Math.abs(this.y % TILE_SIZE) > -this.speed);
+
+                let targetPixelX = this.x, targetPixelY = this.y;
+
+                // --- State-based Targeting ---
+                if (this.isEaten) { // If eaten, target spawn point
                     targetPixelX = this.spawnX; targetPixelY = this.spawnY;
+                    // Check if reached spawn
                     if (Math.abs(this.x - targetPixelX) < this.speed && Math.abs(this.y - targetPixelY) < this.speed) {
-                        this.x = targetPixelX; this.y = targetPixelY;
-                        this.isEaten = false; this.isInsideHouse = true; this.speed = 1.8; // Reset speed 
-                        this.dx = 0; this.dy = -1; 
-                        return; 
+                        this.x = targetPixelX; this.y = targetPixelY; // Snap to spawn
+                        this.isEaten = false; this.isInsideHouse = true; this.speed = 1.8; // Reset speed
+                        this.dx = 0; this.dy = -1; // Aim to move up from spawn (towards door)
+                        return;
                     }
-                } else if (this.isInsideHouse) {
+                } else if (this.isInsideHouse) { // If inside house, target door
                     targetPixelX = this.doorTarget.x; targetPixelY = this.doorTarget.y;
-                    if (this.y <= targetPixelY && Math.abs(this.x - targetPixelX) < this.speed) {
-                         this.x = targetPixelX; this.y = targetPixelY; 
+                    // Check if at or above door's Y and aligned X-wise to exit
+                    if (this.y <= targetPixelY && Math.abs(this.x - targetPixelX) < this.speed ) {
+                         this.x = targetPixelX; this.y = targetPixelY; // Snap to door position
                          this.isInsideHouse = false;
+                         // Attempt to exit left or right randomly
                          this.dx = Math.random() < 0.5 ? -1 : 1; this.dy = 0;
-                         return;
+
+                         // Ensure the chosen exit path isn't a wall
+                         const exitCheckX = Math.floor((this.x + this.dx * TILE_SIZE) / TILE_SIZE);
+                         const exitCheckY = Math.floor(this.y / TILE_SIZE);
+                         if (this.isWall(exitCheckX, exitCheckY, true)) { // 'true' for turning logic
+                            this.dx *= -1; // Try other direction
+                            const secondExitCheckX = Math.floor((this.x + this.dx * TILE_SIZE) / TILE_SIZE);
+                            if (this.isWall(secondExitCheckX, exitCheckY, true)) { // If both are walls (stuck at door)
+                                this.dy = -1; this.dx = 0; // Default to trying to move up if stuck
+                            }
+                         }
+                         return; // Exited house logic for this frame
                     }
                 }
-                
+                // Else (outside house, not eaten): Roaming or chasing logic (simplified here to random)
+
+                // --- Movement Decision (if on grid) ---
                 if (onGrid) {
-                    if (this.isEaten || this.isInsideHouse) {
+                     this.x = Math.round(this.x / TILE_SIZE) * TILE_SIZE; // Snap to grid X
+                     this.y = Math.round(this.y / TILE_SIZE) * TILE_SIZE; // Snap to grid Y
+
+                    if (this.isEaten || this.isInsideHouse) { // Pathfinding towards target (spawn or door)
                         const diffX = targetPixelX - this.x;
                         const diffY = targetPixelY - this.y;
                         let preferredDx = 0, preferredDy = 0;
+
+                        // Prioritize vertical movement if inside house and below door
                         if (this.isInsideHouse && this.y > targetPixelY) preferredDy = -1;
+                        // Else, prioritize horizontal alignment if inside house and not at door's X
+                        else if (this.isInsideHouse && this.x !== targetPixelX) preferredDx = Math.sign(targetPixelX - this.x);
+                        // General pathfinding: move along the axis with greater distance to target
                         else if (Math.abs(diffY) > Math.abs(diffX) && diffY !== 0) preferredDy = Math.sign(diffY);
                         else if (diffX !== 0) preferredDx = Math.sign(diffX);
-                        else if (diffY !== 0) preferredDy = Math.sign(diffY);
-                        
-                        if (preferredDy !== 0 && !this.isWall(this.x/TILE_SIZE, (this.y + preferredDy*TILE_SIZE)/TILE_SIZE, true)) { this.dx = 0; this.dy = preferredDy; } 
-                        else if (preferredDx !== 0 && !this.isWall((this.x + preferredDx*TILE_SIZE)/TILE_SIZE, this.y/TILE_SIZE, true)) { this.dx = preferredDx; this.dy = 0; } 
-                        else { 
-                            const availableMoves = [];
-                            if (!this.isWall(this.x/TILE_SIZE, (this.y - TILE_SIZE)/TILE_SIZE, true)) availableMoves.push({dx:0, dy:-1});
-                            if (!this.isWall(this.x/TILE_SIZE, (this.y + TILE_SIZE)/TILE_SIZE, true)) availableMoves.push({dx:0, dy:1});
-                            if (!this.isWall((this.x - TILE_SIZE)/TILE_SIZE, this.y/TILE_SIZE, true)) availableMoves.push({dx:-1, dy:0});
-                            if (!this.isWall((this.x + TILE_SIZE)/TILE_SIZE, this.y/TILE_SIZE, true)) availableMoves.push({dx:1, dy:0});
-                            if(availableMoves.length > 0){ const move = availableMoves[Math.floor(Math.random() * availableMoves.length)]; this.dx = move.dx; this.dy = move.dy; }
+                        else if (diffY !== 0) preferredDy = Math.sign(diffY); // Only if already at target X
+
+                        // Check if preferred direction is valid
+                        if (preferredDy !== 0 && !this.isWall(this.x/TILE_SIZE, (this.y + preferredDy*TILE_SIZE)/TILE_SIZE, true)) {
+                            this.dx = 0; this.dy = preferredDy;
+                        } else if (preferredDx !== 0 && !this.isWall((this.x + preferredDx*TILE_SIZE)/TILE_SIZE, this.y/TILE_SIZE, true)) {
+                            this.dx = preferredDx; this.dy = 0;
+                        } else { // Fallback: if preferred path is blocked, choose a random valid move
+                            const availableMoves = this.getAvailableMoves();
+                            if(availableMoves.length > 0){
+                                const move = availableMoves[Math.floor(Math.random() * availableMoves.length)];
+                                this.dx = move.dx; this.dy = move.dy;
+                            } else { this.dx = 0; this.dy = 0;} // Stuck
                         }
-                    } else { 
-                        const possibleMoves = [];
-                        if (!this.isWall(this.x/TILE_SIZE, (this.y - TILE_SIZE)/TILE_SIZE, true) && this.dy !== 1) possibleMoves.push({dx:0, dy:-1});
-                        if (!this.isWall(this.x/TILE_SIZE, (this.y + TILE_SIZE)/TILE_SIZE, true) && this.dy !== -1) possibleMoves.push({dx:0, dy:1});
-                        if (!this.isWall((this.x - TILE_SIZE)/TILE_SIZE, this.y/TILE_SIZE, true) && this.dx !== 1) possibleMoves.push({dx:-1, dy:0});
-                        if (!this.isWall((this.x + TILE_SIZE)/TILE_SIZE, this.y/TILE_SIZE, true) && this.dx !== -1) possibleMoves.push({dx:1, dy:0});
-                        let chosenMoves = possibleMoves;
-                        if (!this.isFrightened) { 
-                            chosenMoves = possibleMoves.filter(m => !(m.dx === -this.dx && m.dy === -this.dy));
-                            if (chosenMoves.length === 0 && possibleMoves.length > 0) chosenMoves = possibleMoves;
+                    } else { // Standard roaming behavior (outside house, not eaten, not frightened or intelligently targeting)
+                        const availableMoves = this.getAvailableMoves();
+                        let chosenMoves = availableMoves;
+
+                        if (!this.isFrightened) { // If not frightened, try not to reverse direction unless it's the only option
+                            chosenMoves = availableMoves.filter(m => !(m.dx === -this.dx && m.dy === -this.dy && availableMoves.length > 1) );
+                            if (chosenMoves.length === 0 && availableMoves.length > 0) chosenMoves = availableMoves; // If only option is reverse, take it
                         }
-                        if (chosenMoves.length > 0) { const move = chosenMoves[Math.floor(Math.random() * chosenMoves.length)]; this.dx = move.dx; this.dy = move.dy; }
+                        // If frightened, all available moves are equally likely (random)
+
+                        if (chosenMoves.length > 0) {
+                            const move = chosenMoves[Math.floor(Math.random() * chosenMoves.length)];
+                            this.dx = move.dx; this.dy = move.dy;
+                        } else { // No valid moves (should be rare in a connected maze)
+                            this.dx = 0; this.dy = 0;
+                        }
                     }
                 }
 
+                // --- Actual Movement ---
                 const currentActualSpeed = this.isFrightened && !this.isEaten ? this.speed * 0.65 : (this.isEaten ? this.speed * 2.5 : this.speed);
                 const nextX = this.x + this.dx * currentActualSpeed;
                 const nextY = this.y + this.dy * currentActualSpeed;
-                const currentTileX = Math.floor(this.x / TILE_SIZE);
-                const currentTileY = Math.floor(this.y / TILE_SIZE);
 
-                if (this.dx !== 0) { 
-                    const nextWallCheckX = Math.floor((nextX + (this.dx > 0 ? TILE_SIZE - 0.1 : 0.1)) / TILE_SIZE);
-                    if (!this.isWall(nextWallCheckX, currentTileY, false)) this.x = nextX;
-                    else { this.x = Math.round(this.x / TILE_SIZE) * TILE_SIZE; if(onGrid && !this.isEaten && !this.isInsideHouse) this.dx=0; } 
+                // Collision detection with walls before moving
+                if (this.dx !== 0) {
+                    const wallCheckGridX = Math.floor((nextX + (this.dx > 0 ? TILE_SIZE - 0.1 : 0.1)) / TILE_SIZE);
+                    const currentGridY = Math.floor(this.y / TILE_SIZE);
+                    if (!this.isWall(wallCheckGridX, currentGridY, false)) this.x = nextX;
+                    else { this.x = Math.round(this.x / TILE_SIZE) * TILE_SIZE; if (!this.isEaten && !this.isInsideHouse) {this.dx=0; this.dy=0;}}
                 }
-                if (this.dy !== 0) { 
-                    const nextWallCheckY = Math.floor((nextY + (this.dy > 0 ? TILE_SIZE - 0.1 : 0.1)) / TILE_SIZE);
-                     if (!this.isWall(currentTileX, nextWallCheckY, false)) this.y = nextY;
-                    else { this.y = Math.round(this.y / TILE_SIZE) * TILE_SIZE; if(onGrid && !this.isEaten && !this.isInsideHouse) this.dy=0; } 
+                if (this.dy !== 0) {
+                    const wallCheckGridY = Math.floor((nextY + (this.dy > 0 ? TILE_SIZE - 0.1 : 0.1)) / TILE_SIZE);
+                    const currentGridX = Math.floor(this.x / TILE_SIZE);
+                    if (!this.isWall(currentGridX, wallCheckGridY, false)) this.y = nextY;
+                    else { this.y = Math.round(this.y / TILE_SIZE) * TILE_SIZE; if (!this.isEaten && !this.isInsideHouse) {this.dx=0; this.dy=0;}}
                 }
 
+                // Tunnel logic for ghosts
                 const characterGridY = Math.floor(this.y / TILE_SIZE);
                 const characterPixelYOnGrid = characterGridY * TILE_SIZE;
-                const isVerticallyAlignedForTunnel = (Math.abs(this.y - characterPixelYOnGrid) < this.speed);
+                const isVerticallyAlignedForTunnel = (Math.abs(this.y - characterPixelYOnGrid) < currentActualSpeed);
 
-                if (TUNNEL_ROW_INDICES.includes(characterGridY) && isVerticallyAlignedForTunnel) {
-                     if (this.y !== characterPixelYOnGrid) { 
-                         this.y = characterPixelYOnGrid;
+                if (currentTunnelRows.includes(characterGridY) && isVerticallyAlignedForTunnel && !this.isInsideHouse && !this.isEaten) {
+                     if (Math.abs(this.y - characterPixelYOnGrid) > 0.1) {
+                         this.y = characterPixelYOnGrid; // Snap to tunnel row Y
                     }
-                    if (this.x <= -TILE_SIZE && this.dx < 0) { 
-                        this.x = canvas.width - TILE_SIZE; 
-                    } else if (this.x >= canvas.width && this.dx > 0) { 
-                        this.x = 0; 
-                    }
+                    if (this.x <= -TILE_SIZE && this.dx < 0) this.x = canvas.width - TILE_SIZE;
+                    else if (this.x >= canvas.width && this.dx > 0) this.x = 0;
                 }
             }
-            isWall(gridX, gridY, isTurning) { 
+
+            /**
+             * Gets a list of available moves (not into walls).
+             * @returns {Array<{dx: number, dy: number}>} List of possible moves.
+             */
+            getAvailableMoves() {
+                const moves = [];
+                const currentGridX = this.x / TILE_SIZE;
+                const currentGridY = this.y / TILE_SIZE;
+                // Check UP, DOWN, LEFT, RIGHT
+                if (!this.isWall(currentGridX, currentGridY - 1, true)) moves.push({dx:0, dy:-1});
+                if (!this.isWall(currentGridX, currentGridY + 1, true)) moves.push({dx:0, dy:1});
+                if (!this.isWall(currentGridX - 1, currentGridY, true)) moves.push({dx:-1, dy:0});
+                if (!this.isWall(currentGridX + 1, currentGridY, true)) moves.push({dx:1, dy:0});
+                return moves;
+            }
+
+
+            /**
+             * Checks if a given grid coordinate is a wall, considering ghost-specific rules.
+             * @param {number} gridX - The X grid coordinate.
+             * @param {number} gridY - The Y grid coordinate.
+             * @param {boolean} isTurningLogic - True if this check is for a potential turn.
+             * @returns {boolean} True if it's a wall for this ghost, false otherwise.
+             */
+            isWall(gridX, gridY, isTurningLogic) {
                 const x = Math.floor(gridX); const y = Math.floor(gridY);
-                const currentGhostGridY = Math.floor(this.y / TILE_SIZE);
-                const isVerticallyAlignedEnough = Math.abs(this.y - (currentGhostGridY * TILE_SIZE)) < this.speed;
 
-
-                if (TUNNEL_ROW_INDICES.includes(currentGhostGridY) && isVerticallyAlignedEnough && !isTurning) {
-                     if ((x < 0 && this.dx < 0) || (x >= MAZE_LAYOUT[0].length && this.dx > 0)) {
-                        return false; 
+                // Tunnel logic for ghosts (they shouldn't use it when eaten or inside house typically)
+                if (!this.isEaten && !this.isInsideHouse) {
+                    const currentGhostGridY = Math.floor(this.y / TILE_SIZE);
+                    const isVerticallyAlignedEnough = Math.abs(this.y - (currentGhostGridY * TILE_SIZE)) < this.speed;
+                    if (currentTunnelRows.includes(currentGhostGridY) && isVerticallyAlignedEnough && !isTurningLogic) {
+                        if ((x < 0 && this.dx < 0) || (x >= currentMazeLayout[0].length && this.dx > 0)) {
+                            return false; // Allow passing through tunnel openings
+                        }
                     }
                 }
 
-                if (y < 0 || y >= MAZE_LAYOUT.length || x < 0 || x >= MAZE_LAYOUT[0].length) return true;
-                const tileType = MAZE_LAYOUT[y][x];
-                if (tileType === 4 && !this.isEaten) return false; 
-                if (x === GHOST_DOOR_POS.x && y === GHOST_DOOR_POS.y && tileType === 0) return false; 
-                return tileType === 1; 
+                // Bounds check
+                if (y < 0 || y >= currentMazeLayout.length || x < 0 || x >= currentMazeLayout[0].length) return true;
+
+                const tileType = currentMazeLayout[y][x];
+
+                // Ghost door: Ghosts can always pass through their designated door tile if it's '0'
+                if (x === currentGhostDoorPos.x && y === currentGhostDoorPos.y && tileType === 0) return false;
+
+                // Ghost house area (tile 4): Ghosts can pass if they are eaten or inside the house.
+                // They cannot pass if they are outside and trying to get in (unless it's the door).
+                if (tileType === 4 && (this.isEaten || this.isInsideHouse)) return false;
+
+                // Standard wall check
+                return tileType === 1; // Only tile type 1 is a hard wall for ghosts outside the house.
             }
+
             enterFrightenedMode() {
                 if (!this.isEaten) {
                     this.isFrightened = true;
-                    const onGrid = (this.x % TILE_SIZE < this.speed && this.x % TILE_SIZE > -this.speed) && 
-                                   (this.y % TILE_SIZE < this.speed && this.y % TILE_SIZE > -this.speed);
+                    // Reverse direction if on grid and moving, and not inside house
+                    const onGrid = (Math.abs(this.x % TILE_SIZE) < this.speed) && (Math.abs(this.y % TILE_SIZE) < this.speed);
                     if (onGrid && (this.dx !== 0 || this.dy !== 0) && !this.isInsideHouse) {
                        this.dx *= -1; this.dy *= -1;
                     }
                 }
             }
+
             getEaten() {
-                if (this.isFrightened) { 
-                    this.isEaten = true; this.isFrightened = false; 
-                    score += 200 * (ghosts.filter(g => g.isEaten).length + 1); 
+                if (this.isFrightened) {
+                    this.isEaten = true; this.isFrightened = false;
+                    // Score multiplier for eating multiple ghosts in one power pellet duration could be added here
+                    score += 200 * (ghosts.filter(g => g.isEaten && g.isFrightened === false).length); // Multiplier for chain eating
                     updateScoreboard();
                 }
             }
         }
 
-        function initMaze() {
-            pellets = []; ghosts = [];  
-            const ghostColors = ['#f00', '#0ff', '#f8b', '#fa0']; 
-            let ghostSpawnCoords = []; 
+        /**
+         * Initializes the maze, pellets, Pac-Man, and ghosts for the current level.
+         */
+        function initMazeAndEntities() {
+            mutableMaze = JSON.parse(JSON.stringify(currentMazeLayout)); // Deep copy for pellet tracking
+            pellets = []; ghosts = []; pacman = null;
+            const ghostColors = ['#f00', '#0ff', '#f8b', '#fa0']; // Blinky, Pinky, Inky, Clyde
+            let ghostSpawnCoords = [];
+            let pacmanSpawnPos = {x: -1, y: -1};
 
-            for (let y = 0; y < MAZE_LAYOUT.length; y++) {
-                for (let x = 0; x < MAZE_LAYOUT[0].length; x++) {
-                    const tileType = MAZE_LAYOUT[y][x]; 
+            // Find spawn points and pellets from the maze layout
+            for (let y = 0; y < currentMazeLayout.length; y++) {
+                for (let x = 0; x < currentMazeLayout[0].length; x++) {
+                    const tileType = currentMazeLayout[y][x];
                     if (tileType === 2) pellets.push({ x: x * TILE_SIZE + TILE_SIZE / 2, y: y * TILE_SIZE + TILE_SIZE / 2, type: 'normal', gridX: x, gridY: y });
                     else if (tileType === 3) pellets.push({ x: x * TILE_SIZE + TILE_SIZE / 2, y: y * TILE_SIZE + TILE_SIZE / 2, type: 'power', gridX: x, gridY: y });
-                    else if (tileType === 5 && !pacman) pacman = new PacMan(x * TILE_SIZE, y * TILE_SIZE);
+                    else if (tileType === 5) pacmanSpawnPos = {x: x * TILE_SIZE, y: y * TILE_SIZE};
                     else if (tileType === 4) ghostSpawnCoords.push({x: x * TILE_SIZE, y: y * TILE_SIZE});
                 }
             }
-            ghostSpawnCoords.forEach((pos, index) => {
-                if (index < ghostColors.length) ghosts.push(new Ghost(pos.x, pos.y, ghostColors[index]));
-            });
-            for (let i = ghosts.length; i < ghostColors.length; i++) {
-                const spawnPos = ghostSpawnCoords.length > 0 ? ghostSpawnCoords[0] : {x: GHOST_DOOR_POS.x * TILE_SIZE, y: (GHOST_DOOR_POS.y + 1) * TILE_SIZE}; 
-                ghosts.push(new Ghost(spawnPos.x, spawnPos.y, ghostColors[i]));
+
+            // Create Pac-Man
+            if (pacmanSpawnPos.x === -1) { // Fallback PacMan spawn if '5' is not defined
+                console.warn("PacMan spawn (tile 5) not found in maze. Placing at default or first empty.");
+                // Try to find first non-wall tile as fallback
+                let foundEmpty = false;
+                for (let r = 0; r < currentMazeLayout.length; r++) {
+                    for (let c = 0; c < currentMazeLayout[0].length; c++) {
+                        if(currentMazeLayout[r][c] === 0 || currentMazeLayout[r][c] === 2 || currentMazeLayout[r][c] === 3){
+                            pacmanSpawnPos = {x: c * TILE_SIZE, y: r * TILE_SIZE};
+                            foundEmpty = true; break;
+                        }
+                    }
+                    if(foundEmpty) break;
+                }
+                if(!foundEmpty) pacmanSpawnPos = {x: TILE_SIZE, y: TILE_SIZE}; // Absolute fallback
             }
-            if (!pacman) pacman = new PacMan(TILE_SIZE, TILE_SIZE); 
+            pacman = new PacMan(pacmanSpawnPos.x, pacmanSpawnPos.y);
+
+            // Create Ghosts
+            if (ghostSpawnCoords.length === 0) { // Fallback if no '4' tiles (ghost spawn areas) defined
+                console.warn("Ghost spawn (tile 4) not found. Spawning near ghost door.");
+                for(let i=0; i < ghostColors.length; i++) {
+                    // Place them inside the conceptual house, offset from the door
+                    ghostSpawnCoords.push({
+                        x: currentGhostDoorPos.x * TILE_SIZE + (i % 2 === 0 ? -TILE_SIZE : TILE_SIZE), // Stagger X
+                        y: (currentGhostDoorPos.y + 1 + Math.floor(i/2)) * TILE_SIZE // Stagger Y, below door
+                    });
+                }
+            }
+            ghostColors.forEach((color, index) => {
+                const spawnPos = ghostSpawnCoords[index % ghostSpawnCoords.length]; // Cycle through defined spawns
+                ghosts.push(new Ghost(spawnPos.x, spawnPos.y, color));
+            });
+            resizeCanvas(); // Ensure canvas is sized correctly for the new maze
         }
 
-        function drawMaze() { 
-            for (let y = 0; y < MAZE_LAYOUT.length; y++) { 
-                for (let x = 0; x < MAZE_LAYOUT[0].length; x++) {
-                    if (MAZE_LAYOUT[y][x] === 1) { 
-                        ctx.fillStyle = '#00f'; 
+        /**
+         * Draws the static parts of the maze (walls).
+         */
+        function drawMaze() {
+            if (!currentMazeLayout) return;
+            ctx.fillStyle = '#00f'; // Wall color
+            for (let y = 0; y < currentMazeLayout.length; y++) {
+                for (let x = 0; x < currentMazeLayout[0].length; x++) {
+                    const tileType = currentMazeLayout[y][x];
+                    if (tileType === 1) { // Wall
                         ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
                     }
+                    // Optional: Draw ghost house differently or ghost door for visual distinction
+                    // else if (tileType === 4) { ctx.fillStyle = '#33a'; ctx.fillRect(x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE); ctx.fillStyle = '#00f';}
+                    // else if (tileType === 0 && x === currentGhostDoorPos.x && y === currentGhostDoorPos.y) { ctx.fillStyle = '#f0f'; ctx.fillRect(x*TILE_SIZE, y*TILE_SIZE + TILE_SIZE*0.4, TILE_SIZE, TILE_SIZE*0.2); ctx.fillStyle = '#00f'; }
                 }
             }
         }
-        function drawPellets() { 
-             pellets.forEach(pellet => { 
-                // Check the original MAZE_LAYOUT for pellet type to determine color
-                const originalTileType = MAZE_LAYOUT[pellet.gridY][pellet.gridX];
-                if (originalTileType === 3) { // Power pellet (was number 3)
-                    ctx.fillStyle = '#FFA500'; // Orange color for power pellets
-                } else {
-                    ctx.fillStyle = '#fff'; // White for normal pellets
-                }
+
+        /**
+         * Draws the pellets on the canvas.
+         */
+        function drawPellets() {
+             pellets.forEach(pellet => {
+                // Pellet color and size based on its type (normal or power)
+                const originalTileType = currentMazeLayout[pellet.gridY][pellet.gridX]; // Check original type, not mutableMaze
+                if (originalTileType === 3) ctx.fillStyle = '#FFA500'; // Power pellet (orange)
+                else ctx.fillStyle = '#fff'; // Normal pellet (white)
+
                 ctx.beginPath();
-                const radius = originalTileType === 3 ? TILE_SIZE / 3 : TILE_SIZE / 6;
-                ctx.arc(pellet.x, pellet.y, radius, 0, 2 * Math.PI); ctx.fill();
+                const radius = originalTileType === 3 ? TILE_SIZE / 3 : TILE_SIZE / 6; // Power pellets are larger
+                ctx.arc(pellet.x, pellet.y, radius, 0, 2 * Math.PI);
+                ctx.fill();
             });
         }
+
+        // --- UI Update Functions ---
         function updateScoreboard() { scoreBoard.textContent = `Score: ${score}`; }
         function updateLivesBoard() { livesBoard.textContent = `Lives: ${lives}`; }
+        function updateLevelBoard() { levelBoard.textContent = `Level: ${currentLevelIndex + 1}`; }
+
+        /**
+         * Shows a message box on the screen.
+         * @param {string} title - The title of the message.
+         * @param {string} text - The main text of the message (can include HTML).
+         * @param {string} buttonText - Text for the button.
+         * @param {function} onButtonClick - Callback function when the button is clicked.
+         */
         function showMessage(title, text, buttonText, onButtonClick) {
-            messageTitle.textContent = title; messageText.innerHTML = text; messageButton.textContent = buttonText;
+            messageTitle.textContent = title;
+            messageText.innerHTML = text; // Use innerHTML to allow <br> etc.
+            
+            // The original button is a const, we need to get a fresh reference or ensure it's `let`
+            // For simplicity here, we'll ensure messageButton is always the current one.
+            // If it was replaced, the old reference would be stale.
+            let currentMsgButton = document.getElementById('messageButton'); // Get current button
+            currentMsgButton.textContent = buttonText;
             messageBox.style.display = 'block';
-            messageButton.onclick = () => { hideMessage(); if (onButtonClick) onButtonClick(); };
+
+            // To avoid multiple listeners, clone and replace the button.
+            const newButton = currentMsgButton.cloneNode(true);
+            currentMsgButton.parentNode.replaceChild(newButton, currentMsgButton);
+            // Update the global `messageButton` reference to the new button
+            // This was the source of the error if `messageButton` was `const`
+            messageButton = newButton;
+
+
+            messageButton.onclick = () => {
+                hideMessage();
+                if (onButtonClick) onButtonClick();
+            };
         }
         function hideMessage() { messageBox.style.display = 'none'; }
-        
-        function resetPlayerAndGhosts() { 
-            let pacmanSpawnX = TILE_SIZE, pacmanSpawnY = TILE_SIZE; 
-             for (let y = 0; y < MAZE_LAYOUT.length; y++) { 
-                for (let x = 0; x < MAZE_LAYOUT[0].length; x++) {
-                    if (MAZE_LAYOUT[y][x] === 5) { pacmanSpawnX = x * TILE_SIZE; pacmanSpawnY = y * TILE_SIZE; break; }
-                } if (MAZE_LAYOUT[y].includes(5)) break; 
-            }
-            pacman.x = pacmanSpawnX; pacman.y = pacmanSpawnY;
-            pacman.dx = 0; pacman.dy = 0; pacman.nextDx = 0; pacman.nextDy = 0; pacman.mouthAngle = 0.2 * Math.PI;
 
+        /**
+         * Resets Pac-Man and ghosts to their starting positions and states for the current life/level.
+         */
+        function resetPlayerAndGhosts() {
+            if (!pacman) {
+                console.error("Pacman not initialized before resetPlayerAndGhosts call");
+                return;
+            }
+            // Reset Pac-Man to his designated spawn point for the current level
+            pacman.x = pacman.spawnX;
+            pacman.y = pacman.spawnY;
+            pacman.dx = 0; pacman.dy = 0; pacman.nextDx = 0; pacman.nextDy = 0;
+            pacman.mouthAngle = 0.2 * Math.PI; // Reset mouth
+
+            // Reset Ghosts
             ghosts.forEach(g => {
                 g.x = g.spawnX; g.y = g.spawnY;
-                g.isFrightened = false; g.isEaten = false; g.isInsideHouse = true; 
-                g.dx = 0; g.dy = -1; 
+                g.isFrightened = false; g.isEaten = false;
+                g.isInsideHouse = true; // Assume they start inside
+                g.dx = 0; g.dy = -1; // Default to trying to move up (towards door)
+                g.doorTarget = { x: currentGhostDoorPos.x * TILE_SIZE, y: currentGhostDoorPos.y * TILE_SIZE }; // Re-assign door target for current level
             });
             frightenedMode = false; frightenedTimer = 0;
         }
 
-        function checkCollisions() { 
+        /**
+         * Checks for collisions between Pac-Man and ghosts.
+         */
+        function checkCollisions() {
+            if (!pacman || !gameRunning) return;
             ghosts.forEach(ghost => {
+                if (ghost.isEaten) return; // Eaten ghosts can't collide
+
                 const distX = (pacman.x + TILE_SIZE / 2) - (ghost.x + TILE_SIZE / 2);
                 const distY = (pacman.y + TILE_SIZE / 2) - (ghost.y + TILE_SIZE / 2);
                 const distance = Math.sqrt(distX * distX + distY * distY);
-                if (distance < pacman.radius + ghost.radius - (TILE_SIZE * 0.2) ) { 
-                    if (ghost.isFrightened && !ghost.isEaten) { ghost.getEaten();
-                    } else if (!ghost.isEaten) { 
-                        lives--; updateLivesBoard(); gameRunning = false; 
-                        if (lives <= 0) { gameOver(); 
+
+                // Collision if distance is less than sum of radii (with a bit of tolerance)
+                if (distance < pacman.radius + ghost.radius - (TILE_SIZE * 0.2)) {
+                    if (ghost.isFrightened) { // Pac-Man eats frightened ghost
+                        ghost.getEaten();
+                    } else { // Ghost catches Pac-Man
+                        lives--;
+                        updateLivesBoard();
+                        gameRunning = false; // Pause game briefly
+                        if (lives <= 0) {
+                            gameOver();
                         } else {
-                            showMessage("Caught!", "Try again!", "OK", () => {
-                                resetPlayerAndGhosts(); gameRunning = true; requestAnimationFrame(gameLoop); 
+                            showMessage("Caught!", `Lives left: ${lives}<br>Try again!`, "OK", () => {
+                                resetPlayerAndGhosts();
+                                gameRunning = true; // Resume game
+                                // gameLoop continues via requestAnimationFrame
                             });
                         }
                     }
                 }
             });
         }
-        function initGame() { 
-            score = 0; lives = 3; updateScoreboard(); updateLivesBoard();
-            maze = JSON.parse(JSON.stringify(MAZE_LAYOUT)); 
-            initMaze(); resetPlayerAndGhosts(); hideMessage(); gameRunning = true; 
-        }
-        function gameOver() { 
-            gameRunning = false; finalScoreDisplay.textContent = score;
-            showMessage("Game Over", `Your final score: <span id="finalScore">${score}</span>`, "Restart", () => {
-                initGame(); requestAnimationFrame(gameLoop); 
-            });
-        }
-        function gameWon() { 
-            gameRunning = false; finalScoreDisplay.textContent = score;
-            showMessage("You Win!", `All pellets eaten! Score: <span id="finalScore">${score}</span>`, "Play Again", () => {
-                initGame(); requestAnimationFrame(gameLoop); 
-            });
-        }
-        
-        let lastTime = 0; const GHOST_UPDATE_INTERVAL = 110; let ghostUpdateTimer = 0;
 
-        function gameLoop(timestamp) { 
-            if (!gameRunning && lives > 0) { requestAnimationFrame(gameLoop); return; }
-            if (!gameRunning && lives <= 0) { requestAnimationFrame(gameLoop); return; }
-            const deltaTime = timestamp - lastTime; lastTime = timestamp;
+        // --- Game Flow Control ---
+        /**
+         * Sets up and starts the current level.
+         * @param {boolean} isInitialStart - True if this is the very first start of the game session.
+         */
+        function startGameFlow(isInitialStart = false) {
+            // Load the configuration for the current level index
+            if (!loadLevelConfig(currentLevelIndex)) {
+                // This means all defined levels are beaten
+                showMessage("YOU WIN!", `Congratulations! You beat all ${allMazeConfigs.length} levels!<br>Final Score: ${score}`, "Play Again From Level 1", () => {
+                    currentLevelIndex = 0; score = 0; lives = 3; // Full reset
+                    initGame(true); // Start a new game from level 1
+                });
+                return;
+            }
+
+            initMazeAndEntities(); // Create Pac-Man, ghosts, pellets for the loaded level
+            resetPlayerAndGhosts(); // Position them correctly
+            updateScoreboard();
+            updateLivesBoard();
+            updateLevelBoard();
+            hideMessage();
+            gameRunning = true;
+
+            if(isInitialStart) { // Only start the main gameLoop if it's the very first game start
+                 lastTime = performance.now(); // Reset lastTime for smooth delta on new game/level
+                 requestAnimationFrame(gameLoop);
+            } else {
+                 lastTime = performance.now(); // Also reset for level transitions to avoid large deltaTime
+            }
+        }
+
+        /**
+         * Initializes or re-initializes the game.
+         * @param {boolean} isNewFullGame - True to reset score, lives, and level to start.
+         */
+        function initGame(isNewFullGame = false) {
+            if (isNewFullGame || lives <= 0) { // Reset for a brand new game session or after game over
+                score = 0;
+                lives = 3;
+                currentLevelIndex = 0;
+            }
+            startGameFlow(isNewFullGame); // Pass flag to indicate if gameLoop needs initial kick-off
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            finalScoreDisplay.textContent = score; // Ensure final score is in the message
+            showMessage("Game Over", `Your final score: ${score}<br>Reached Level: ${currentLevelIndex + 1}`, "Restart Game", () => {
+                initGame(true); // Restart as a new full game from level 1
+            });
+        }
+
+        function gameWon() { // Called when all pellets on current level are eaten
+            gameRunning = false;
+            currentLevelIndex++; // Advance to the next level
+            if (currentLevelIndex < allMazeConfigs.length) { // Check if there's a next level
+                showMessage(`Level ${currentLevelIndex} Cleared!`, `Score: ${score}<br>Get Ready for Level ${currentLevelIndex + 1}!`, "Next Level", () => {
+                    startGameFlow(false); // Start next level; game loop is already running
+                });
+            } else { // All defined levels beaten
+                showMessage("YOU WIN!", `Congratulations! You beat all levels!<br>Final Score: ${score}`, "Play Again", () => {
+                    initGame(true); // Play again as a new full game from level 1
+                });
+            }
+        }
+
+        // --- Main Game Loop ---
+        let lastTime = 0;
+        const GHOST_UPDATE_INTERVAL = 100; // Ghosts update slightly less frequently than Pac-Man for classic feel
+        let ghostUpdateTimer = 0;
+
+        function gameLoop(timestamp) {
+            // If game is paused (e.g. message box shown), don't update game state but keep RAF running
+            if (!gameRunning && messageBox.style.display !== 'none') {
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+             // If game isn't running (e.g. after life lost but before message dismissed) and no message is up, also pause.
+            if (!gameRunning && messageBox.style.display === 'none' && lives > 0) {
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+            // Critical check: if maze or pacman isn't ready, bail to prevent errors.
+            if (!currentMazeLayout || !pacman) {
+                console.warn("Game loop called before essential elements initialized.");
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+
+            const deltaTime = timestamp - lastTime;
+            lastTime = timestamp;
+
+            // Cap deltaTime to prevent large jumps if tab loses focus (e.g., max 100ms or ~10fps)
+            const effectiveDeltaTime = Math.min(deltaTime, 100);
+
+            // Clear canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            drawMaze(); drawPellets(); pacman.update(); pacman.draw();
-            ghostUpdateTimer += deltaTime;
-            if(ghostUpdateTimer >= GHOST_UPDATE_INTERVAL){ ghosts.forEach(ghost => ghost.update()); ghostUpdateTimer = 0; }
+
+            // Draw elements
+            drawMaze();
+            drawPellets();
+            pacman.update(); // Pac-Man logic (movement, eating)
+            pacman.draw();
+
+            // Ghost logic update (can be less frequent than rendering)
+            ghostUpdateTimer += effectiveDeltaTime;
+            if(ghostUpdateTimer >= GHOST_UPDATE_INTERVAL){
+                ghosts.forEach(ghost => ghost.update());
+                ghostUpdateTimer = 0; // Reset timer
+            }
             ghosts.forEach(ghost => ghost.draw());
-            if (gameRunning) checkCollisions();
+
+            if (gameRunning) checkCollisions(); // Check for Pac-Man/ghost collisions
+
+            // Frightened mode timer
             if (frightenedMode) {
-                frightenedTimer -= deltaTime;
+                frightenedTimer -= effectiveDeltaTime;
                 if (frightenedTimer <= 0) {
                     frightenedMode = false;
                     ghosts.forEach(g => { if (!g.isEaten) g.isFrightened = false; });
                 }
             }
-            requestAnimationFrame(gameLoop);
+            requestAnimationFrame(gameLoop); // Continue the loop
         }
 
-        window.addEventListener('keydown', (e) => { 
-            if (!gameRunning && messageBox.style.display === 'none' && lives > 0) {
-                 if (e.key.startsWith("Arrow") || e.key === " ") { initGame(); requestAnimationFrame(gameLoop); }
+        // --- Event Listeners ---
+        window.addEventListener('keydown', (e) => {
+            // If a message box is shown, Enter/Space should trigger its button
+            if (messageBox.style.display !== 'none') {
+                if (e.key === "Enter" || e.key === " ") {
+                    messageButton.click(); // Use the up-to-date messageButton reference
+                    e.preventDefault();
+                }
+                return; // Don't process game controls if message is up
             }
-            if (!gameRunning) return; 
+
+            if (!gameRunning || !pacman) return; // Only process game controls if game is running
+
             switch (e.key) {
-                case 'ArrowUp': case 'w': pacman.setDirection(0, -1); e.preventDefault(); break;
-                case 'ArrowDown': case 's': pacman.setDirection(0, 1); e.preventDefault(); break;
-                case 'ArrowLeft': case 'a': pacman.setDirection(-1, 0); e.preventDefault(); break;
-                case 'ArrowRight': case 'd': pacman.setDirection(1, 0); e.preventDefault(); break;
+                case 'ArrowUp': case 'w': case 'W': pacman.setDirection(0, -1); e.preventDefault(); break;
+                case 'ArrowDown': case 's': case 'S': pacman.setDirection(0, 1); e.preventDefault(); break;
+                case 'ArrowLeft': case 'a': case 'A': pacman.setDirection(-1, 0); e.preventDefault(); break;
+                case 'ArrowRight': case 'd': case 'D': pacman.setDirection(1, 0); e.preventDefault(); break;
             }
         });
-        
+
+        // Touch Controls Setup
         const touchControlsDiv = document.getElementById('touchControls');
         function isTouchDevice() { return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0); }
-        if (isTouchDevice()) { 
-            touchControlsDiv.style.display = 'grid';
-            const handleTouchStart = () => { if (!gameRunning && messageBox.style.display === 'none' && lives > 0) { initGame(); requestAnimationFrame(gameLoop); } };
-            document.getElementById('touchUp').addEventListener('click', () => { handleTouchStart(); if (gameRunning) pacman.setDirection(0, -1); });
-            document.getElementById('touchDown').addEventListener('click', () => { handleTouchStart(); if (gameRunning) pacman.setDirection(0, 1); });
-            document.getElementById('touchLeft').addEventListener('click', () => { handleTouchStart(); if (gameRunning) pacman.setDirection(-1, 0); });
-            document.getElementById('touchRight').addEventListener('click', () => { handleTouchStart(); if (gameRunning) pacman.setDirection(1, 0); });
+
+        if (isTouchDevice()) {
+            touchControlsDiv.style.display = 'grid'; // Show touch controls
+            const handleTouchControl = (dx, dy) => {
+                if (messageBox.style.display !== 'none') { // If message box is up, tap acts like button press
+                    messageButton.click(); // Use the up-to-date messageButton reference
+                    return;
+                }
+                if (gameRunning && pacman) pacman.setDirection(dx, dy);
+            };
+            document.getElementById('touchUp').addEventListener('click', () => handleTouchControl(0, -1));
+            document.getElementById('touchDown').addEventListener('click', () => handleTouchControl(0, 1));
+            document.getElementById('touchLeft').addEventListener('click', () => handleTouchControl(-1, 0));
+            document.getElementById('touchRight').addEventListener('click', () => handleTouchControl(1, 0));
         }
 
-        resizeCanvas();
-        showMessage("Pac-Man", "Use Arrow Keys or Tap to Move. Eat all pellets!", "Start Game", () => {
-            initGame();
-            requestAnimationFrame(gameLoop);
+        // --- Initial Game Setup ---
+        // Show initial message and start game on button click
+        showMessage("Pac-Man", "Use Arrow Keys or Tap Controls to Move.<br>Eat all pellets to win!", "Start Game", () => {
+            initGame(true); // True for initial full game start, will kick off gameLoop
         });
+
     </script>
 </body>
 </html>
