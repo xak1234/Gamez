@@ -55,7 +55,8 @@ let gameOver = false;
 let level = 1;
 let missilesThisLevel = 0;
 let missilesLaunched = 0;
-let missileBaseSpeed = 0.25;
+let missileBaseSpeed = 0.55;
+let levelingUp = false;
 
 // Sound
 const sndLaunch = document.getElementById('sndLaunch');
@@ -275,6 +276,7 @@ function drawGameOver() {
 function spawnEnemyMissile() {
     let aliveCities = cities.filter(c => c.alive);
     if (aliveCities.length === 0) return;
+    if (missilesLaunched >= missilesThisLevel) return;
     let target = aliveCities[Math.floor(Math.random() * aliveCities.length)];
     let x0 = Math.random() * w;
     let y0 = 0;
@@ -282,6 +284,7 @@ function spawnEnemyMissile() {
     let y1 = h - 70;
     let speed = missileBaseSpeed + (level - 1) * 0.06 + Math.random() * 0.35;
     enemyMissiles.push({ x0, y0, x: x0, y: y0, x1, y1, speed });
+    missilesLaunched++;
 }
 
 function spawnPlayerMissile(targetX, targetY) {
@@ -443,9 +446,11 @@ function gameLoop() {
     }
 
     // Level up check: all missiles for this level launched and none left on screen
-    if (!gameOver && missilesLaunched >= missilesThisLevel && enemyMissiles.length === 0) {
+    if (!gameOver && !levelingUp && missilesLaunched >= missilesThisLevel && enemyMissiles.length === 0) {
+        levelingUp = true;
         setTimeout(() => {
             startLevel(level + 1);
+            levelingUp = false;
         }, 1200);
     }
 
@@ -499,6 +504,7 @@ canvas.addEventListener('contextmenu', function(e) {
     score = 0;
     gameOver = false;
     lastBombTime = 0;
+    levelingUp = false;
     startLevel(1);
     gameLoop();
 });
