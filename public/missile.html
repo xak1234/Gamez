@@ -43,6 +43,7 @@ const w = canvas.width, h = canvas.height;
 const CITY_NAMES = ["LEEDS", "YORK", "MANCHESTER", "ROTHERHAM", "BRADFORD"];
 const NUM_CITIES = CITY_NAMES.length;
 const LAUNCHER_POS = [100, 250, 400, 550, 700];
+const MISSILES_PER_CITY = 50;
 let cities = [];
 let missiles = [];
 let enemyMissiles = [];
@@ -63,16 +64,49 @@ function playSound(audio, rate=1) {
     } catch {}
 }
 
-// City positions
+// City positions (with missile count)
 for (let i = 0; i < NUM_CITIES; i++) {
     cities.push({
         name: CITY_NAMES[i],
         x: LAUNCHER_POS[i],
-        alive: true
+        alive: true,
+        missiles: MISSILES_PER_CITY
     });
 }
 
-// Drawing functions
+// Factory/cityscape drawing BETWEEN cities
+function drawCityBackground() {
+    ctx.save();
+    // Draw factory elements BETWEEN cities
+    for (let i = 0; i < cities.length - 1; i++) {
+        let x = (cities[i].x + cities[i+1].x) / 2;
+        // Big smokestack
+        ctx.fillStyle = "#444";
+        ctx.fillRect(x - 10, h - 130, 18, 80);
+        // Big factory block
+        ctx.fillStyle = "#222";
+        ctx.fillRect(x - 32, h - 70, 60, 35);
+        // Warehouse front
+        ctx.fillStyle = "#555";
+        ctx.fillRect(x - 22, h - 40, 44, 20);
+        // Windows/lights
+        ctx.fillStyle = "#ffd700";
+        for (let k = 0; k < 5; k++) {
+            ctx.fillRect(x - 28 + k * 12, h - 60, 6, 10);
+        }
+        // Chimney smoke (cartoon)
+        ctx.beginPath();
+        ctx.arc(x, h - 140, 10, 0, 2 * Math.PI);
+        ctx.fillStyle = "rgba(200,200,200,0.22)";
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x + 7, h - 152, 7, 0, 2 * Math.PI);
+        ctx.fillStyle = "rgba(210,210,210,0.14)";
+        ctx.fill();
+    }
+    ctx.restore();
+}
+
 function drawTitle() {
     ctx.save();
     ctx.font = "40px 'Press Start 2P', monospace";
@@ -96,10 +130,18 @@ function drawCities() {
             ctx.arc(cities[i].x, h - 75, 12, Math.PI, 0);
             ctx.fill();
         }
-        // City names
+        // City name
+        ctx.font = "18px 'Press Start 2P', monospace";
         ctx.fillStyle = "#ff0";
         ctx.textAlign = "center";
         ctx.fillText(cities[i].name, cities[i].x, h - 15);
+
+        // Missile number (UNDER city)
+        ctx.font = "18px 'Press Start 2P', monospace";
+        ctx.fillStyle = cities[i].alive
+          ? (cities[i].missiles > 0 ? "#0cf" : "#f33")
+          : "#222";
+        ctx.fillText("▲ " + cities[i].missiles, cities[i].x, h - 5);
     }
     ctx.restore();
 }
@@ -161,10 +203,10 @@ function spawnEnemyMissile() {
 }
 
 function spawnPlayerMissile(targetX, targetY) {
-    // Find closest launcher
-    let minDist = Infinity, idx = 0;
+    // Find closest alive launcher with ammo
+    let minDist = Infinity, idx = -1;
     for (let i = 0; i < cities.length; i++) {
-        if (cities[i].alive) {
+        if (cities[i].alive && cities[i].missiles > 0) {
             let d = Math.abs(cities[i].x - targetX);
             if (d < minDist) {
                 minDist = d;
@@ -172,10 +214,12 @@ function spawnPlayerMissile(targetX, targetY) {
             }
         }
     }
+    if (idx === -1) return; // No city with ammo
     let x0 = cities[idx].x;
     let y0 = h - 75;
     let speed = 5;
     missiles.push({ x0, y0, x: x0, y: y0, x1: targetX, y1: targetY, speed });
+    cities[idx].missiles--;
     playSound(sndLaunch, 1.2);
 }
 
@@ -248,6 +292,7 @@ function updateExplosions() {
 function gameLoop() {
     ctx.clearRect(0, 0, w, h);
     document.getElementById("score").innerHTML = `Score: ${score}`;
+    drawCityBackground();
     drawTitle();
     drawCities();
     drawMissiles();
@@ -271,9 +316,8 @@ function gameLoop() {
 // Missile spawn interval
 let missileInterval = setInterval(() => {
     if (!gameOver) spawnEnemyMissile();
-}, 1100); // Slightly slower spawn
+}, 1100);
 
-// Click to fire
 canvas.addEventListener('click', function(e) {
     if (gameOver) return;
     let rect = canvas.getBoundingClientRect();
@@ -282,7 +326,6 @@ canvas.addEventListener('click', function(e) {
     if (y < h - 120) spawnPlayerMissile(x, y);
 });
 
-// Reset on game over click
 canvas.addEventListener('contextmenu', function(e) {
     e.preventDefault();
     if (!gameOver) return;
@@ -292,7 +335,8 @@ canvas.addEventListener('contextmenu', function(e) {
         cities.push({
             name: CITY_NAMES[i],
             x: LAUNCHER_POS[i],
-            alive: true
+            alive: true,
+            missiles: MISSILES_PER_CITY
         });
     }
     missiles = [];
@@ -303,7 +347,6 @@ canvas.addEventListener('contextmenu', function(e) {
     gameLoop();
 });
 
-// Start game
 gameLoop();
 </script>
 </body>
