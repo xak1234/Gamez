@@ -3,14 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Space Invaders - Mad UFOs!</title>
+    <title>Space Invaders - Waves & Power-Ups!</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
         body, html { width: 100%; height: 100%; margin: 0; padding: 0; background-color: #000; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'Press Start 2P', cursive; overflow: hidden; }
         canvas { display: block; background-color: #000; box-shadow: 0 0 10px 5px #0f0, 0 0 15px 10px #0f0 inset; border: 2px solid #0f0; border-radius: 8px; image-rendering: pixelated; image-rendering: -moz-crisp-edges; image-rendering: -webkit-optimize-contrast; max-width: 100%; max-height: 80vh; aspect-ratio: 4 / 3; }
-        #gameInfo { display: flex; justify-content: space-around; width: 100%; max-width: 500px; margin-bottom: 10px; font-size: 1.1rem; color: #0f0; }
+        #gameInfo { display: flex; flex-wrap: wrap; justify-content: center; /* Centered items */ width: 100%; max-width: 600px; /* Wider for more items */ margin-bottom: 10px; font-size: 1.0rem; color: #0f0; text-align: center;}
+        #gameInfo > div { margin: 2px 8px; /* More spacing */ }
         #laserTimeBoard { color: #ff9900; visibility: hidden; }
+        #fireRateBoostIndicator { color: #00ffff; visibility: hidden; font-size: 0.9em;}
+        #doubleShotIndicator { color: #f0f; visibility: hidden; font-size: 0.9em;}
+        #scoreMultiplierIndicator { color: #ffff00; visibility: hidden; font-size: 0.9em;} /* SCORE MULTIPLIER: UI Style */
+        #waveDisplay { color: #7f7fff; font-size: 1.1em; } /* WAVE SYSTEM: UI Style */
+
         #messageBox { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(0, 0, 0, 0.85); color: #fff; padding: 30px; border: 3px solid #0f0; border-radius: 10px; text-align: center; z-index: 100; box-shadow: 0 0 15px #0f0; display: none; }
         #messageBox h1 { font-size: 2rem; color: #0f0; margin-bottom: 15px; }
         #messageBox p { font-size: 1rem; margin-bottom: 20px; }
@@ -19,16 +25,33 @@
         #touchControls { display: none; margin-top: 15px; width: 100%; max-width: 400px; justify-content: space-between; }
         #touchControls button { font-size: 1.5rem; padding: 15px 20px; width: 30%; flex-grow: 1; margin: 0 5px; }
         #touchControls button:first-child { margin-left: 0; } #touchControls button:last-child { margin-right: 0; }
-        @media (max-width: 600px) { #touchControls { display: flex; } #gameInfo { font-size: 0.9rem; flex-direction: column; align-items: center; } #scoreBoard, #livesBoard, #laserTimeBoard { margin-bottom: 3px; } #messageBox h1 { font-size: 1.5rem; } #messageBox p { font-size: 0.9rem; } #messageBox button { padding: 10px 20px; font-size: 0.9rem; } canvas { max-height: 70vh; } }
-        @media (max-height: 450px) and (orientation: landscape) { #gameInfo { flex-direction: row; font-size: 0.8rem; margin-bottom: 5px; } canvas { max-height: 65vh; } #touchControls { margin-top: 10px; } #touchControls button { font-size: 1.2rem; padding: 10px 15px; } #messageBox { padding: 15px; } #messageBox h1 { font-size: 1.2rem; } #messageBox p { font-size: 0.8rem; } #messageBox button { padding: 8px 12px; font-size: 0.8rem; } }
+        
+        /* SCREEN SHAKE: CSS for screen shake */
+        .shake {
+            animation: shake 0.15s cubic-bezier(.36,.07,.19,.97) both;
+            transform: translate3d(0, 0, 0);
+            backface-visibility: hidden;
+            perspective: 1000px;
+        }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-3px, 0, 0); }
+            40%, 60% { transform: translate3d(3px, 0, 0); }
+        }
+
+        @media (max-width: 600px) { #touchControls { display: flex; } #gameInfo { font-size: 0.8rem; flex-direction: column; align-items: center; } #gameInfo > div { margin-bottom: 2px; } #messageBox h1 { font-size: 1.5rem; } #messageBox p { font-size: 0.9rem; } #messageBox button { padding: 10px 20px; font-size: 0.9rem; } canvas { max-height: 70vh; } }
+        @media (max-height: 450px) and (orientation: landscape) { #gameInfo { flex-direction: row; font-size: 0.7rem; } canvas { max-height: 65vh; } #touchControls { margin-top: 10px; } #touchControls button { font-size: 1.2rem; padding: 10px 15px; } #messageBox { padding: 15px; } #messageBox h1 { font-size: 1.2rem; } #messageBox p { font-size: 0.8rem; } #messageBox button { padding: 8px 12px; font-size: 0.8rem; } }
     </style>
 </head>
 <body>
     <div id="gameInfo">
         <div id="scoreBoard">Score: 0</div>
         <div id="livesBoard">Lives: 3</div>
-        <div id="laserTimeBoard">Laser Time: 0s</div>
-    </div>
+        <div id="waveDisplay">Wave: 1</div> <div id="laserTimeBoard">Laser Time: 0s</div>
+        <div id="fireRateBoostIndicator">Fire Rate Up!</div>
+        <div id="doubleShotIndicator">Double Shot!</div>
+        <div id="scoreMultiplierIndicator">2x Score!</div> </div>
     <canvas id="gameCanvas"></canvas>
     <div id="messageBox"><h1 id="messageTitle"></h1><p id="messageText"></p><button id="messageButton"></button></div>
     <div id="touchControls"><button id="touchLeft">⬅️</button><button id="touchFire">🔥</button><button id="touchRight">➡️</button></div>
@@ -38,6 +61,10 @@
         const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
         const scoreBoard = document.getElementById('scoreBoard'), livesBoard = document.getElementById('livesBoard');
         const laserTimeBoard = document.getElementById('laserTimeBoard');
+        const fireRateBoostIndicator = document.getElementById('fireRateBoostIndicator'); 
+        const doubleShotIndicator = document.getElementById('doubleShotIndicator'); 
+        const scoreMultiplierIndicator = document.getElementById('scoreMultiplierIndicator'); // SCORE MULTIPLIER
+        const waveDisplay = document.getElementById('waveDisplay'); // WAVE SYSTEM
         const finalScoreDisplay = document.getElementById('finalScore'); 
         const messageBox = document.getElementById('messageBox'), messageTitle = document.getElementById('messageTitle');
         const messageText = document.getElementById('messageText');
@@ -46,17 +73,19 @@
         // Game State Variables
         let player, ufo, chopper; 
         let score = 0, lives = 3, gameRunning = false;
-        let alienDirection = 1, alienSpeed = 0.5, alienDropDistance = 20, alienShootInterval = 1000, lastAlienShotTime = 0;
-        const baseAlienSpeed = 0.5, speedIncreasePerKill = 0.01; 
+        let alienDirection = 1, alienBaseSpeed = 0.5, alienSpeed = 0.5, alienDropDistance = 20, alienShootInterval = 1000, lastAlienShotTime = 0; // WAVE SYSTEM: alienBaseSpeed
+        let baseAlienBulletSpeed = 3; // WAVE SYSTEM
+        let currentAlienBulletSpeed = 3; // WAVE SYSTEM
+
+        const speedIncreasePerKill = 0.01; 
         
         // Spawn Timers and Intervals
-        let ufoSpawnTimer = 0;
-        const ufoSpawnInterval = 10000; // UFO: Increased occurrence (was 15000)
-        let chopperSpawnTimer = 0;
-        const chopperSpawnInterval = 20000; 
+        let ufoSpawnTimer = 0; const ufoSpawnInterval = 10000; 
+        let chopperSpawnTimer = 0; const chopperSpawnInterval = 20000; 
 
         // Game Object Arrays
         let invaders = [], bullets = [], alienBullets = [], barriers = [], chopperBombs = []; 
+        let scoreMultipliers = []; // SCORE MULTIPLIER: Array for multiplier items
 
         // Player Properties
         const playerWidth = 50, playerHeight = 30, playerSpeed = 5;
@@ -64,6 +93,8 @@
 
         // Bullet Properties
         const bulletWidth = 5, bulletHeight = 15, bulletSpeed = 7, normalBulletColor = '#0f0';
+        const maxNormalBullets = 3; const maxBoostedBullets = 4; 
+        let playerFireRateBoostActive = false; let missedUfoCount = 0; 
 
         // Laser Power-up Properties
         let playerHasLaser = false, laserActivationTime = 0;
@@ -72,20 +103,26 @@
         let isLaserBeamActive = false, laserBeamEndTime = 0;
         const laserBeamVisualDuration = 150, laserBeamWidth = 8, laserColor = '#ff9900';
 
+        // DOUBLE SHOT EVENT: Variables
+        let isRandomDoubleShotActive = false; let randomDoubleShotActivationTime = 0;
+        const randomDoubleShotDuration = 15000; const randomDoubleShotChance = 0.03; 
+        let lastRandomDoubleShotCheck = 0; const randomDoubleShotCheckInterval = 5000; 
+        const doubleShotBulletOffsetX = 8; 
+
         // Alien Properties
         const alienRows = 5, alienCols = 10, alienWidth = 30, alienHeight = 20, alienPadding = 10, alienOffsetTop = 30, alienOffsetLeft = 30;
         const totalInvaders = alienRows * alienCols; 
         
         // Barrier Properties
         const barrierCount = 4, barrierBlockWidth = 70, barrierBlockHeight = 30, barrierSegmentSize = 10; 
-        
+        let barrierTopY; 
+
         // UFO Properties
         const ufoWidth = 45, ufoHeight = 20, baseUfoSpeed = 2, ufoColor = '#ff0000', ufoPoints = 100; 
 
         // Chopper Properties
         const chopperWidth = 60, chopperHeight = 25, chopperSpeed = 2.5, chopperColor = '#c0c0c0', chopperPoints = 150;
-        const chopperAltitude = 50; 
-        const chopperBombDropInterval = 2000; 
+        const chopperAltitude = 50; const chopperBombDropInterval = 2000; 
         let lastChopperBombDropTime = 0;
         const bombWidth = 6, bombHeight = 12, bombSpeed = 4, bombColor = '#ffcc00';
 
@@ -93,53 +130,55 @@
         const keys = { ArrowLeft: false, ArrowRight: false, Space: false };
 
         // Audio Variables
-        let synth, laserSynth, noiseSynth, ufoSynth, invaderMoveSynth, chopperSynth, bombDropSynth; 
+        let synth, laserSynth, noiseSynth, ufoSynth, invaderMoveSynth, chopperSynth, bombDropSynth, powerUpSound, scoreMultiplierSound; 
         let invaderMoveSequence; 
         let audioInitialized = false;
-        const baseInvaderBPM = 60;
-        const maxInvaderBPM = 240;
+        const baseInvaderBPM = 60; const maxInvaderBPM = 240;
+
+        // WAVE SYSTEM: Current wave
+        let currentWave = 1;
+
+        // SCORE MULTIPLIER: Variables
+        let isScoreMultiplierActive = false;
+        let scoreMultiplierActivationTime = 0;
+        const scoreMultiplierDuration = 15000; 
+        const scoreMultiplierValue = 2;
+        let lastScoreMultiplierSpawnCheck = 0;
+        const scoreMultiplierSpawnInterval = 25000; 
+        const scoreMultiplierSpawnChance = 0.2; 
+        const scoreMultiplierSize = 15;
+        const scoreMultiplierColor = '#ffff00'; 
+        const scoreMultiplierDespawnTime = 8000; 
 
 
         // --- AUDIO INITIALIZATION ---
         function initializeAudio() {
-            console.log("initializeAudio called"); // DEBUG
-            if (audioInitialized) { console.log("Audio already initialized."); return; }
+            if (audioInitialized) return;
             try {
                 Tone.start(); 
-                console.log("Tone.start() attempted."); // DEBUG
-
                 synth = new Tone.Synth({ oscillator: { type: "square" }, envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.1 }}).toDestination();
                 laserSynth = new Tone.Synth({ oscillator: { type: "sawtooth" }, envelope: { attack: 0.01, decay: 0.2, sustain: 0.05, release: 0.1 }, volume: -5 }).toDestination();
                 noiseSynth = new Tone.NoiseSynth({ noise: { type: "white" }, envelope: { attack: 0.005, decay: 0.15, sustain: 0, release: 0.1 }, volume: -15 }).toDestination();
-                
                 ufoSynth = new Tone.Oscillator({ type: "sine", frequency: 880, volume: -25 }).toDestination();
                 new Tone.LFO({ frequency: 2, type: "sine", min: 700, max: 1000 }).connect(ufoSynth.frequency).start();
-                
-                invaderMoveSynth = new Tone.MembraneSynth({
-                    pitchDecay: 0.01, octaves: 2, oscillator: { type: "sine" },
-                    envelope: { attack: 0.001, decay: 0.2, sustain: 0.01, release: 0.1 }, volume: -18
-                }).toDestination();
-                
+                invaderMoveSynth = new Tone.MembraneSynth({ pitchDecay: 0.01, octaves: 2, oscillator: { type: "sine" }, envelope: { attack: 0.001, decay: 0.2, sustain: 0.01, release: 0.1 }, volume: -18 }).toDestination();
                 invaderMoveSequence = new Tone.Sequence((time, note) => { if(invaderMoveSynth) invaderMoveSynth.triggerAttackRelease(note, "32n", time); }, ["C2", "D#2", "F#2", "A2"], "4n");
                 invaderMoveSequence.loop = true; Tone.Transport.bpm.value = baseInvaderBPM;
-                console.log("Invader sequence created."); // DEBUG
-
-                chopperSynth = new Tone.NoiseSynth({ 
-                    noise: { type: "brown" }, 
-                    envelope: { attack: 0.05, decay: 0.1, sustain: 0.8, release: 0.2 }, 
-                    volume: -25 
-                }).toDestination();
-
+                chopperSynth = new Tone.NoiseSynth({ noise: { type: "brown" }, envelope: { attack: 0.05, decay: 0.1, sustain: 0.8, release: 0.2 }, volume: -25 }).toDestination();
                 bombDropSynth = new Tone.Synth({ oscillator: {type: "triangle"}, envelope: {attack:0.001, decay:0.3, sustain:0, release:0.1}, pitchDecay: 0.05, volume: -10}).toDestination();
-                
-                audioInitialized = true; 
-                console.log("Audio Initialized Successfully"); // DEBUG
+                powerUpSound = new Tone.Synth({ oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.05, release: 0.2 }, volume: -8 }).toDestination();
+                scoreMultiplierSound = new Tone.Synth({ // SCORE MULTIPLIER: Sound
+                    oscillator: { type: "sine" },
+                    envelope: { attack: 0.005, decay: 0.2, sustain: 0.1, release: 0.3 },
+                    volume: -6
+                }).toDestination();
+                audioInitialized = true; console.log("Audio Initialized Successfully");
             } catch (e) { console.error("Error during audio initialization:", e); audioInitialized = false; }
         }
 
         // --- SOUND PLAYBACK ---
         function playSound(type, options = {}) {
-            if (!audioInitialized || !Tone.context || Tone.context.state !== 'running') { console.warn("Audio not ready for sound:", type, "- Context state:", Tone.context ? Tone.context.state : "No context"); return; }
+            if (!audioInitialized || !Tone.context || Tone.context.state !== 'running') return;
             try {
                 switch (type) {
                     case 'playerShoot': synth.triggerAttackRelease("C5", "8n"); break;
@@ -155,6 +194,8 @@
                     case 'chopperFlyStart': if (chopperSynth) chopperSynth.triggerAttack(Tone.now()); break; 
                     case 'chopperFlyStop': if (chopperSynth) chopperSynth.triggerRelease(Tone.now() + 0.1); break; 
                     case 'bombDrop': if (bombDropSynth) bombDropSynth.triggerAttackRelease("G2", "8n"); break; 
+                    case 'powerUpActivate': if(powerUpSound) powerUpSound.triggerAttackRelease("E5", "8n"); break; 
+                    case 'scoreMultiplierPickup': if(scoreMultiplierSound) scoreMultiplierSound.triggerAttackRelease("G5", "4n"); break; 
                 }
             } catch (error) { console.error("Error playing sound:", type, error); }
         }
@@ -162,16 +203,19 @@
         // --- UI UPDATES ---
         function updateScoreboard() { scoreBoard.textContent = `Score: ${score}`; }
         function updateLivesBoard() { livesBoard.textContent = `Lives: ${lives}`; }
-        function updateLaserTimeBoard() {
+        function updatePowerUpIndicators() { 
             if (playerHasLaser) {
                 const timeRemaining = Math.max(0, Math.ceil((laserActivationTime + currentLaserDuration - Date.now()) / 1000));
                 laserTimeBoard.textContent = `${currentLaserDuration === doubleLaserDuration ? "Dbl " : ""}Laser: ${timeRemaining}s`;
                 laserTimeBoard.style.color = currentLaserDuration === doubleLaserDuration ? playerDoubleLaserColor : playerLaserColor;
                 laserTimeBoard.style.visibility = 'visible';
-            } else {
-                laserTimeBoard.style.visibility = 'hidden';
-            }
+            } else { laserTimeBoard.style.visibility = 'hidden'; }
+            fireRateBoostIndicator.style.visibility = playerFireRateBoostActive && !playerHasLaser ? 'visible' : 'hidden'; 
+            doubleShotIndicator.style.visibility = isRandomDoubleShotActive && !playerHasLaser ? 'visible' : 'hidden'; 
+            scoreMultiplierIndicator.style.visibility = isScoreMultiplierActive ? 'visible' : 'hidden'; 
+            waveDisplay.textContent = `Wave: ${currentWave}`; 
         }
+
 
         // --- CANVAS RESIZING ---
         function resizeCanvas() { 
@@ -179,17 +223,19 @@
             if (newHeight > window.innerHeight * 0.75) { newHeight = window.innerHeight * 0.75; newWidth = newHeight * aspectRatio; }
             if (newWidth > window.innerWidth * 0.95) { newWidth = window.innerWidth * 0.95; newHeight = newWidth / aspectRatio; if (newHeight > window.innerHeight * 0.75) { newHeight = window.innerHeight * 0.75; newWidth = newHeight * aspectRatio; }}
             const oldCanvasWidth = canvas.width; canvas.width = Math.floor(newWidth); canvas.height = Math.floor(newHeight);
+            barrierTopY = canvas.height - playerHeight - 80; 
+
             if (lives <= 0 && messageBox.style.display === 'block' && !gameRunning) { ctx.clearRect(0, 0, canvas.width, canvas.height); player = player || createPlayer(); player.y = canvas.height - playerHeight - 20; player.x = Math.max(0, Math.min(player.x, canvas.width - player.width)); initBarriers(); drawPlayer(); drawInvaders(); drawBarriers(); drawUFO(); drawChopper(); return; }
             if (gameRunning || lives <= 0 || messageBox.style.display === 'none') {
-                const cs = score, cl = lives, wgar = gameRunning, pla = playerHasLaser, plaT = laserActivationTime, cld = currentLaserDuration;
+                const cs = score, cl = lives, wgar = gameRunning, pla = playerHasLaser, plaT = laserActivationTime, cld = currentLaserDuration, frb = playerFireRateBoostActive, muc = missedUfoCount, rds = isRandomDoubleShotActive, rdsT = randomDoubleShotActivationTime, sma = isScoreMultiplierActive, smaT = scoreMultiplierActivationTime, cw = currentWave; 
                 let uD = ufo && oldCanvasWidth > 0 ? { ...ufo, x: ufo.x * (canvas.width / oldCanvasWidth) } : (ufo ? { ...ufo } : null);
                 let chD = chopper && oldCanvasWidth > 0 ? { ...chopper, x: chopper.x * (canvas.width / oldCanvasWidth) } : (chopper ? { ...chopper } : null); 
                 let pX = player ? (oldCanvasWidth > 0 ? player.x * (canvas.width / oldCanvasWidth) : player.x) : (canvas.width / 2 - playerWidth / 2);
-                initGame(); score = cs; lives = cl; playerHasLaser = pla; laserActivationTime = plaT; currentLaserDuration = cld; 
+                initGame(); score = cs; lives = cl; playerHasLaser = pla; laserActivationTime = plaT; currentLaserDuration = cld; playerFireRateBoostActive = frb; missedUfoCount = muc; isRandomDoubleShotActive = rds; randomDoubleShotActivationTime = rdsT; isScoreMultiplierActive = sma; scoreMultiplierActivationTime = smaT; currentWave = cw; 
                 if (player) { player.x = pX; player.x = Math.max(0, Math.min(player.x, canvas.width - player.width)); }
                 if (uD && uD.alive) { ufo = uD; if (ufo.x + ufo.width < 0) ufo.x = -ufo.width; if (ufo.x > canvas.width) ufo.x = canvas.width; }
                 if (chD && chD.alive) { chopper = chD; if (chopper.x + chopper.width < 0) chopper.x = -chopper.width; if (chopper.x > canvas.width) chopper.x = canvas.width; } 
-                updateScoreboard(); updateLivesBoard(); updateLaserTimeBoard();
+                updateScoreboard(); updateLivesBoard(); updatePowerUpIndicators();
                 if (lives <= 0) { showGameOverMessage(); gameRunning = false; }
             } else { ctx.clearRect(0, 0, canvas.width, canvas.height); player = player || createPlayer(); player.y = canvas.height - playerHeight - 20; player.x = Math.max(0, Math.min(player.x, canvas.width - player.width)); initBarriers(); drawPlayer(); drawInvaders(); drawBarriers(); drawUFO(); drawChopper(); }
         } 
@@ -199,55 +245,46 @@
         function createInvader(x,y,type){ return {x,y,width:alienWidth,height:alienHeight,color:type===1?'#f0f':(type===2?'#0ff':'#ff0'),type,alive:true};}
         function createBullet(x,y,c,vY){ return {x,y,width:bulletWidth,height:bulletHeight,color:c,velocityY:vY};}
         function createBarrierSegment(x,y){ return {x,y,width:barrierSegmentSize,height:barrierSegmentSize,color:'#0c0',hits:0,maxHits:3,alive:true};}
-        
-        function createUFO() { 
-            playSound('ufoFlyStart'); 
-            const direction = Math.random() < 0.5 ? 1 : -1; 
-            let currentUfoSpeed;
-            const randSpeedFactor = Math.random();
-            if (randSpeedFactor < 0.25) { // SLOW UFO (25% chance)
-                currentUfoSpeed = (0.5 + Math.random() * 0.5) * baseUfoSpeed; // Speed: 1 to 2
-            } else if (randSpeedFactor < 0.65) { // NORMAL UFO (40% chance)
-                currentUfoSpeed = (0.9 + Math.random() * 0.4) * baseUfoSpeed; // Speed: ~1.8 to 2.6
-            } else { // FAST UFO (35% chance)
-                currentUfoSpeed = (1.8 + Math.random() * 1.2) * baseUfoSpeed; // Speed: ~3.6 to 6 (can be "ultra fast")
-            }
-            console.log("UFO created with speed:", currentUfoSpeed); // DEBUG
-            return { 
-                x: direction === 1 ? -ufoWidth : canvas.width, y: alienOffsetTop / 2, 
-                width: ufoWidth, height: ufoHeight, speed: currentUfoSpeed * direction, 
-                color: ufoColor, alive: true, points: ufoPoints 
-            }; 
-        }
-        
-        function createChopper() { playSound('chopperFlyStart'); const direction = Math.random() < 0.5 ? 1 : -1; return { x: direction === 1 ? -chopperWidth : canvas.width, y: chopperAltitude, width: chopperWidth, height: chopperHeight, speed: chopperSpeed * direction, color: chopperColor, alive: true, points: chopperPoints, lastBombDrop: 0 };}
+        function createUFO() { playSound('ufoFlyStart'); const dir = Math.random() < 0.5 ? 1 : -1; let cUS; const rsf = Math.random(); if (rsf < 0.25) { cUS = (0.5 + Math.random() * 0.5) * baseUfoSpeed; } else if (rsf < 0.65) { cUS = (0.9 + Math.random() * 0.4) * baseUfoSpeed; } else { cUS = (1.8 + Math.random() * 1.2) * baseUfoSpeed; } return { x: dir === 1 ? -ufoWidth : canvas.width, y: alienOffsetTop / 2, width: ufoWidth, height: ufoHeight, speed: cUS * dir, color: ufoColor, alive: true, points: ufoPoints }; }
+        function createChopper() { playSound('chopperFlyStart'); const dir = Math.random() < 0.5 ? 1 : -1; return { x: dir === 1 ? -chopperWidth : canvas.width, y: chopperAltitude, width: chopperWidth, height: chopperHeight, speed: chopperSpeed * dir, color: chopperColor, alive: true, points: chopperPoints, lastBombDrop: 0 };}
         function createChopperBomb(x, y) { return { x, y, width: bombWidth, height: bombHeight, color: bombColor, speed: bombSpeed }; }
+        function createScoreMultiplier() { return { x: Math.random() * (canvas.width - scoreMultiplierSize), y: Math.random() * (canvas.height / 2 - scoreMultiplierSize) + alienOffsetTop + alienRows * (alienHeight + alienPadding) + 20, size: scoreMultiplierSize, color: scoreMultiplierColor, alive: true, spawnTime: Date.now() }; }
+
 
         // --- GAME INITIALIZATION ---
-        function initBarriers() { barriers = []; const tbW = barrierCount * barrierBlockWidth; const ts = canvas.width - tbW; const sp = ts / (barrierCount + 1); const bY = canvas.height - playerHeight - 80; for (let i = 0; i < barrierCount; i++) { const bX = sp * (i + 1) + barrierBlockWidth * i; const segs = []; for (let r = 0; r < barrierBlockHeight / barrierSegmentSize; r++) { for (let c = 0; c < barrierBlockWidth / barrierSegmentSize; c++) { segs.push(createBarrierSegment(bX + c * barrierSegmentSize, bY + r * barrierSegmentSize)); }} barriers.push(segs);}} 
-        function initGame() {
-            console.log("initGame called"); // DEBUG
-            player = createPlayer(); invaders = []; bullets = []; alienBullets = []; chopperBombs = []; 
-            ufo = null; chopper = null; 
-            ufoSpawnTimer = Date.now(); chopperSpawnTimer = Date.now();
-            playSound('ufoFlyStop'); playSound('chopperFlyStop');
-            alienDirection = 1; alienSpeed = baseAlienSpeed; lastAlienShotTime = 0;
-            playerHasLaser = false; isLaserBeamActive = false; laserActivationTime = 0; currentLaserDuration = 0; updateLaserTimeBoard();
+        function initBarriers() { barriers = []; barrierTopY = canvas.height - playerHeight - 80; const tbW = barrierCount * barrierBlockWidth; const ts = canvas.width - tbW; const sp = ts / (barrierCount + 1); for (let i = 0; i < barrierCount; i++) { const bX = sp * (i + 1) + barrierBlockWidth * i; const segs = []; for (let r = 0; r < barrierBlockHeight / barrierSegmentSize; r++) { for (let c = 0; c < barrierBlockWidth / barrierSegmentSize; c++) { segs.push(createBarrierSegment(bX + c * barrierSegmentSize, barrierTopY + r * barrierSegmentSize)); }} barriers.push(segs);}} 
+        
+        function resetInvadersForNewWave() { 
+            invaders = [];
+            alienSpeed = alienBaseSpeed + (0.1 * (currentWave -1)); 
+            alienSpeed = Math.min(alienSpeed, 1.5); 
+            currentAlienBulletSpeed = baseAlienBulletSpeed + (0.2 * (currentWave-1));
+            currentAlienBulletSpeed = Math.min(currentAlienBulletSpeed, 6); 
+
             for (let r = 0; r < alienRows; r++) { for (let c = 0; c < alienCols; c++) { invaders.push(createInvader(alienOffsetLeft + c * (alienWidth + alienPadding), alienOffsetTop + r * (alienHeight + alienPadding), (r % 3) + 1)); }}
+        }
+        
+        function initGame() {
+            player = createPlayer(); 
+            bullets = []; alienBullets = []; chopperBombs = []; scoreMultipliers = []; 
+            ufo = null; chopper = null; 
+            ufoSpawnTimer = Date.now(); chopperSpawnTimer = Date.now(); lastScoreMultiplierSpawnCheck = Date.now(); 
+            playSound('ufoFlyStop'); playSound('chopperFlyStop');
+            alienDirection = 1; 
+            // WAVE SYSTEM: Apply speed based on currentWave, but only if currentWave > 1 for subsequent inits, or use base for first init.
+            alienSpeed = alienBaseSpeed + (0.1 * (currentWave > 1 ? currentWave -1 : 0)); 
+            alienSpeed = Math.min(alienSpeed, 1.5);
+            currentAlienBulletSpeed = baseAlienBulletSpeed + (0.2 * (currentWave > 1 ? currentWave -1 : 0));
+            currentAlienBulletSpeed = Math.min(currentAlienBulletSpeed, 6);
+            lastAlienShotTime = 0;
+            playerHasLaser = false; isLaserBeamActive = false; laserActivationTime = 0; currentLaserDuration = 0; 
+            missedUfoCount = 0; playerFireRateBoostActive = false; 
+            isRandomDoubleShotActive = false; randomDoubleShotActivationTime = 0; lastRandomDoubleShotCheck = Date.now(); 
+            isScoreMultiplierActive = false; scoreMultiplierActivationTime = 0; 
+            updatePowerUpIndicators();
+            resetInvadersForNewWave(); 
             initBarriers(); hideMessage(); 
-            
-            if (audioInitialized) {
-                console.log("Attempting to start invader sound sequence in initGame."); // DEBUG
-                Tone.Transport.cancel(); 
-                Tone.Transport.bpm.value = baseInvaderBPM;
-                if (invaderMoveSequence) { 
-                    invaderMoveSequence.loop = true; 
-                    if (invaderMoveSequence.state !== "started") { invaderMoveSequence.start(0); console.log("Invader sequence started.");} // DEBUG
-                    else { console.log("Invader sequence already started."); } // DEBUG
-                } else { console.error("invaderMoveSequence is not defined in initGame!"); } // DEBUG
-                if (Tone.Transport.state !== "started") { Tone.Transport.start(); console.log("Tone.Transport started.");} // DEBUG
-                else { console.log("Tone.Transport already started.");} // DEBUG
-            } else { console.log("Audio not initialized, skipping sound start in initGame."); } // DEBUG
+            if (audioInitialized) { Tone.Transport.cancel(); Tone.Transport.bpm.value = baseInvaderBPM; if (invaderMoveSequence) { invaderMoveSequence.loop = true; if (invaderMoveSequence.state !== "started") invaderMoveSequence.start(0); } if (Tone.Transport.state !== "started") Tone.Transport.start(); }
         }
 
         // --- DRAW FUNCTIONS ---
@@ -259,11 +296,20 @@
         function drawChopperBombs() { if (!Array.isArray(chopperBombs)) return; chopperBombs.forEach(bomb => { ctx.fillStyle = bomb.color; ctx.fillRect(bomb.x, bomb.y, bomb.width, bomb.height); });}
         function drawBarriers() { if (!Array.isArray(barriers)) return; barriers.forEach(bar => { if (!Array.isArray(bar)) return; bar.forEach(seg => { if (seg.alive) { const op = 1 - (seg.hits / seg.maxHits) * 0.7; ctx.fillStyle = `rgba(0, 204, 0, ${op})`; ctx.fillRect(seg.x, seg.y, seg.width, seg.height); }}); });}
         function drawUFO() { if (ufo && ufo.alive) { ctx.fillStyle = ufo.color; ctx.beginPath(); ctx.ellipse(ufo.x + ufo.width / 2, ufo.y + ufo.height / 2, ufo.width / 2, ufo.height / 2, 0, Math.PI, 2 * Math.PI, false); ctx.lineTo(ufo.x + ufo.width, ufo.y + ufo.height); ctx.lineTo(ufo.x, ufo.y + ufo.height); ctx.closePath(); ctx.fill(); ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'; ctx.beginPath(); ctx.ellipse(ufo.x + ufo.width / 2, ufo.y + ufo.height * 0.4, ufo.width * 0.3, ufo.height * 0.25, 0, 0, 2 * Math.PI); ctx.fill(); }}
+        function drawScoreMultipliers() { scoreMultipliers.forEach(sm => { if (sm.alive) { ctx.fillStyle = sm.color; ctx.font = `${sm.size * 1.5}px "Press Start 2P"`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText('⭐', sm.x + sm.size / 2, sm.y + sm.size / 2); }}); }
+
 
         // --- UPDATE LOGIC ---
         function updatePlayer() { if (!player || !gameRunning) return; if (keys.ArrowLeft && player.x > 0) player.x -= playerSpeed; if (keys.ArrowRight && player.x < canvas.width - player.width) player.x += playerSpeed; }
-        function updateBullets() { if (!gameRunning) return; for (let i = bullets.length - 1; i >= 0; i--) { bullets[i].y += bullets[i].velocityY; if (bullets[i].y + bullets[i].height < 0) bullets.splice(i, 1); } for (let i = alienBullets.length - 1; i >= 0; i--) { alienBullets[i].y += alienBullets[i].velocityY; if (alienBullets[i].y > canvas.height) alienBullets.splice(i, 1); }}
-        function updateLaserStatus() { if (playerHasLaser) { if (Date.now() > laserActivationTime + currentLaserDuration) { playerHasLaser = false; isLaserBeamActive = false; if(player) player.color = playerNormalColor; currentLaserDuration = 0; }} if (isLaserBeamActive && Date.now() > laserBeamEndTime) { isLaserBeamActive = false; } updateLaserTimeBoard(); }
+        function updateBullets() { if (!gameRunning) return; for (let i = bullets.length - 1; i >= 0; i--) { bullets[i].y += bullets[i].velocityY; if (bullets[i].y + bullets[i].height < 0) bullets.splice(i, 1); } for (let i = alienBullets.length - 1; i >= 0; i--) { alienBullets[i].y += currentAlienBulletSpeed; if (alienBullets[i].y > canvas.height) alienBullets.splice(i, 1); }}
+        
+        function updatePowerUpsStatus() { 
+            if (playerHasLaser) { if (Date.now() > laserActivationTime + currentLaserDuration) { playerHasLaser = false; isLaserBeamActive = false; if(player) player.color = playerNormalColor; currentLaserDuration = 0; }}
+            if (isLaserBeamActive && Date.now() > laserBeamEndTime) { isLaserBeamActive = false; }
+            if (isRandomDoubleShotActive && Date.now() > randomDoubleShotActivationTime + randomDoubleShotDuration) { isRandomDoubleShotActive = false; }
+            if (isScoreMultiplierActive && Date.now() > scoreMultiplierActivationTime + scoreMultiplierDuration) { isScoreMultiplierActive = false; } 
+            updatePowerUpIndicators();
+        }
         
         function updateInvaderSoundTempo() {
             if (!gameRunning || !audioInitialized || !Array.isArray(invaders) || !invaderMoveSequence) return;
@@ -283,71 +329,104 @@
         function updateInvaders() {
             if (!gameRunning || !Array.isArray(invaders)) return;
             let moveDown = false; const aliveInvaders = invaders.filter(inv => inv.alive);
-            if (aliveInvaders.length === 0 && gameRunning) { gameWon(); return; } 
-            aliveInvaders.forEach(inv => { inv.x += alienSpeed * alienDirection; if (inv.x + inv.width > canvas.width || inv.x < 0) {moveDown = true;} if (player && inv.y + inv.height >= player.y ) { gameOver(); return; } else if (!player && inv.y + inv.height >= canvas.height - playerHeight - 20) { gameOver(); return; }});
+            // WAVE SYSTEM: Check for wave clear
+            if (aliveInvaders.length === 0 && gameRunning) { 
+                gameRunning = false; // Pause game logic
+                currentWave++;
+                updatePowerUpIndicators(); // Update wave display
+                showMessage(`Wave ${currentWave -1} Cleared!`, `Get Ready for Wave ${currentWave}`, "Next Wave", () => {
+                    resetInvadersForNewWave(); // Setup next wave
+                    gameRunning = true; // Resume game
+                    // No need to call requestAnimationFrame here, the main loop will pick it up
+                });
+                return; // Important to return here to prevent further updates this frame
+            } 
+            
+            aliveInvaders.forEach(invader => { 
+                invader.x += alienSpeed * alienDirection; 
+                if (invader.x + invader.width > canvas.width || invader.x < 0) {moveDown = true;} 
+                if (barrierTopY && invader.y + invader.height >= barrierTopY) {
+                    if (Array.isArray(barriers)) {
+                        for (let b = 0; b < barriers.length; b++) { if (!Array.isArray(barriers[b])) continue;
+                            for (let s = barriers[b].length - 1; s >= 0; s--) { const segment = barriers[b][s];
+                                if (segment.alive && invader.x < segment.x + segment.width && invader.x + invader.width > segment.x && invader.y < segment.y + segment.height && invader.y + invader.height > segment.y) { 
+                                    segment.alive = false; playSound('barrierHit'); 
+                                }}}}}
+                if (player && invader.y + invader.height >= player.y ) { gameOver(); return; } 
+                else if (!player && invader.y + invader.height >= canvas.height - playerHeight - 20) { gameOver(); return; }
+            });
             if (!gameRunning) return; 
             if (moveDown) { alienDirection *= -1; invaders.forEach(inv => { if (inv.alive) inv.y += alienDropDistance; }); }
             const ct = Date.now();
             if (ct - lastAlienShotTime > alienShootInterval && aliveInvaders.length > 0) {
                 const bI = []; for(let c = 0; c < alienCols; c++) { let l = null; for(let r = alienRows -1; r >=0; r--) { const i = invaders[r * alienCols + c]; if(i && i.alive) { l = i; break; }} if(l) bI.push(l); }
-                if (bI.length > 0) { const s = bI[Math.floor(Math.random() * bI.length)]; alienBullets.push(createBullet(s.x + s.width / 2 - bulletWidth / 2, s.y + s.height, '#f00', bulletSpeed / 1.5)); lastAlienShotTime = ct; }
+                if (bI.length > 0) { const s = bI[Math.floor(Math.random() * bI.length)]; alienBullets.push(createBullet(s.x + s.width / 2 - bulletWidth / 2, s.y + s.height, '#f00', currentAlienBulletSpeed)); lastAlienShotTime = ct; } 
             }
         }
         function updateUFO() { 
-            if (!gameRunning) return; 
-            const ct = Date.now(); 
-            if (!ufo && ct - ufoSpawnTimer > ufoSpawnInterval) { 
-                if (Math.random() < 0.4) ufo = createUFO(); // UFO: Increased spawn probability
-                ufoSpawnTimer = ct; 
-            } 
-            if (ufo && ufo.alive) { 
-                ufo.x += ufo.speed; 
-                if ((ufo.speed > 0 && ufo.x > canvas.width) || (ufo.speed < 0 && ufo.x + ufo.width < 0)) { 
-                    ufo = null; playSound('ufoFlyStop'); 
-                }
-            }
+            if (!gameRunning) return; const ct = Date.now(); 
+            let currentUfoSpawnInterval = ufoSpawnInterval; let currentUfoSpawnProbability = 0.4; 
+            if (isRandomDoubleShotActive) { currentUfoSpawnInterval = ufoSpawnInterval / 2.5; currentUfoSpawnProbability = 0.65; } 
+            if (!ufo && ct - ufoSpawnTimer > currentUfoSpawnInterval) { if (Math.random() < currentUfoSpawnProbability) ufo = createUFO(); ufoSpawnTimer = ct; } 
+            if (ufo && ufo.alive) { ufo.x += ufo.speed; if ((ufo.speed > 0 && ufo.x > canvas.width) || (ufo.speed < 0 && ufo.x + ufo.width < 0)) { ufo = null; playSound('ufoFlyStop'); missedUfoCount++; if (missedUfoCount >= 2 && !playerHasLaser && !isRandomDoubleShotActive) { playerFireRateBoostActive = true; updatePowerUpIndicators(); }}}
         }
         function updateChopper() { if (!gameRunning) return; const currentTime = Date.now(); if (!chopper && currentTime - chopperSpawnTimer > chopperSpawnInterval) { if (Math.random() < 0.25) { chopper = createChopper(); } chopperSpawnTimer = currentTime; } if (chopper && chopper.alive) { chopper.x += chopper.speed; if ((chopper.speed > 0 && chopper.x > canvas.width) || (chopper.speed < 0 && chopper.x + chopper.width < 0)) { chopper = null; playSound('chopperFlyStop'); } else { if (currentTime - chopper.lastBombDrop > chopperBombDropInterval) { chopperBombs.push(createChopperBomb(chopper.x + chopper.width / 2 - bombWidth / 2, chopper.y + chopper.height)); chopper.lastBombDrop = currentTime; playSound('bombDrop'); }}} for (let i = chopperBombs.length - 1; i >= 0; i--) { chopperBombs[i].y += bombSpeed; if (chopperBombs[i].y > canvas.height) { chopperBombs.splice(i, 1); }}}
+        function updateScoreMultipliers() {
+            if (!gameRunning) return; const now = Date.now();
+            if (scoreMultipliers.length === 0 && now - lastScoreMultiplierSpawnCheck > scoreMultiplierSpawnInterval) { if (Math.random() < scoreMultiplierSpawnChance) { scoreMultipliers.push(createScoreMultiplier()); } lastScoreMultiplierSpawnCheck = now; }
+            for (let i = scoreMultipliers.length - 1; i >= 0; i--) { if (now - scoreMultipliers[i].spawnTime > scoreMultiplierDespawnTime) { scoreMultipliers[i].alive = false; scoreMultipliers.splice(i, 1); }}
+        }
+
 
         // --- COLLISION DETECTION ---
-        function checkLaserBeamCollisions() {  if (!isLaserBeamActive || !player) return; const bCX = player.x + player.width / 2; const bL = bCX - laserBeamWidth / 2; const bR = bCX + laserBeamWidth / 2; if (Array.isArray(invaders)) { invaders.forEach(inv => { if (inv.alive && bL < inv.x + inv.width && bR > inv.x && player.y > inv.y) { inv.alive = false; score += 10 * inv.type; updateScoreboard(); playSound('invaderExplosion'); }});} if (Array.isArray(barriers)) { barriers.forEach(bar => { if (!Array.isArray(bar)) return; bar.forEach(seg => { if (seg.alive && bL < seg.x + seg.width && bR > seg.x && player.y > seg.y ) { seg.alive = false; }}); });}}
+        function checkLaserBeamCollisions() {  if (!isLaserBeamActive || !player) return; const bCX = player.x + player.width / 2; const bL = bCX - laserBeamWidth / 2; const bR = bCX + laserBeamWidth / 2; if (Array.isArray(invaders)) { invaders.forEach(inv => { if (inv.alive && bL < inv.x + inv.width && bR > inv.x && player.y > inv.y) { inv.alive = false; score += isScoreMultiplierActive ? (10 * inv.type * scoreMultiplierValue) : (10 * inv.type); updateScoreboard(); playSound('invaderExplosion'); }});} if (Array.isArray(barriers)) { barriers.forEach(bar => { if (!Array.isArray(bar)) return; bar.forEach(seg => { if (seg.alive && bL < seg.x + seg.width && bR > seg.x && player.y > seg.y ) { seg.alive = false; }}); });}}
         function checkCollisions() {
             if (!gameRunning) return;
             for (let i = bullets.length - 1; i >= 0; i--) {
                 const b = bullets[i]; if (!b) continue; let bRmv = false;
-                if (Array.isArray(invaders)) { for (let j = invaders.length - 1; j >= 0; j--) { if (invaders[j].alive && b.x < invaders[j].x + invaders[j].width && b.x + b.width > invaders[j].x && b.y < invaders[j].y + invaders[j].height && b.y + b.height > invaders[j].y) { invaders[j].alive = false; score += 10 * invaders[j].type; updateScoreboard(); alienSpeed += speedIncreasePerKill; bullets.splice(i, 1); bRmv = true; playSound('invaderExplosion'); break; }}}
+                if (Array.isArray(invaders)) { for (let j = invaders.length - 1; j >= 0; j--) { if (invaders[j].alive && b.x < invaders[j].x + invaders[j].width && b.x + b.width > invaders[j].x && b.y < invaders[j].y + invaders[j].height && b.y + b.height > invaders[j].y) { invaders[j].alive = false; score += isScoreMultiplierActive ? (10 * invaders[j].type * scoreMultiplierValue) : (10 * invaders[j].type); updateScoreboard(); alienSpeed += speedIncreasePerKill; bullets.splice(i, 1); bRmv = true; playSound('invaderExplosion'); break; }}}
                 if (bRmv) continue;
-                if (ufo && ufo.alive && b.x < ufo.x + ufo.width && b.x + b.width > ufo.x && b.y < ufo.y + ufo.height && b.y + b.height > ufo.y) { ufo.alive = false; score += ufo.points; updateScoreboard(); if (!playerHasLaser || currentLaserDuration !== doubleLaserDuration) { playerHasLaser = true; laserActivationTime = Date.now(); currentLaserDuration = standardLaserDuration; if(player) player.color = playerLaserColor; } updateLaserTimeBoard(); bullets.splice(i, 1); bRmv = true; ufo = null; playSound('ufoExplosion'); playSound('ufoFlyStop'); }
+                if (ufo && ufo.alive && b.x < ufo.x + ufo.width && b.x + b.width > ufo.x && b.y < ufo.y + ufo.height && b.y + b.height > ufo.y) { ufo.alive = false; score += isScoreMultiplierActive ? (ufo.points * scoreMultiplierValue) : ufo.points; updateScoreboard(); if (!playerHasLaser || currentLaserDuration !== doubleLaserDuration) { playerHasLaser = true; laserActivationTime = Date.now(); currentLaserDuration = standardLaserDuration; if(player) player.color = playerLaserColor; } missedUfoCount = 0; playerFireRateBoostActive = false; isRandomDoubleShotActive = false; updatePowerUpIndicators(); bullets.splice(i, 1); bRmv = true; ufo = null; playSound('ufoExplosion'); playSound('ufoFlyStop'); }
                 if (bRmv) continue;
-                if (chopper && chopper.alive && b.x < chopper.x + chopper.width && b.x + b.width > chopper.x && b.y < chopper.y + chopper.height && b.y + b.height > chopper.y) { chopper.alive = false; score += chopper.points; updateScoreboard(); playerHasLaser = true; laserActivationTime = Date.now(); currentLaserDuration = doubleLaserDuration; if(player) player.color = playerDoubleLaserColor; updateLaserTimeBoard(); bullets.splice(i, 1); bRmv = true; chopper = null; playSound('chopperExplosion'); playSound('chopperFlyStop'); }
+                if (chopper && chopper.alive && b.x < chopper.x + chopper.width && b.x + b.width > chopper.x && b.y < chopper.y + chopper.height && b.y + b.height > chopper.y) { chopper.alive = false; score += isScoreMultiplierActive ? (chopper.points * scoreMultiplierValue) : chopper.points; updateScoreboard(); playerHasLaser = true; laserActivationTime = Date.now(); currentLaserDuration = doubleLaserDuration; if(player) player.color = playerDoubleLaserColor; missedUfoCount = 0; playerFireRateBoostActive = false; isRandomDoubleShotActive = false; updatePowerUpIndicators(); bullets.splice(i, 1); bRmv = true; chopper = null; playSound('chopperExplosion'); playSound('chopperFlyStop'); }
                 if (bRmv) continue;
                 if (Array.isArray(barriers)) { for (let bi = 0; bi < barriers.length; bi++) { if (!Array.isArray(barriers[bi])) continue; for (let s = barriers[bi].length - 1; s >= 0; s--) { const seg = barriers[bi][s]; if (seg.alive && b.x < seg.x + seg.width && b.x + b.width > seg.x && b.y < seg.y + seg.height && b.y + b.height > seg.y) { seg.hits++; if (seg.hits >= seg.maxHits) seg.alive = false; bullets.splice(i, 1); bRmv = true; playSound('barrierHit'); break; }} if (bRmv) break; }}
             }
+            if(player && Array.isArray(scoreMultipliers)) { for (let i = scoreMultipliers.length - 1; i >= 0; i--) { const sm = scoreMultipliers[i]; if (sm.alive && player.x < sm.x + sm.size && player.x + player.width > sm.x && player.y < sm.y + sm.size && player.y + player.height > sm.y) { isScoreMultiplierActive = true; scoreMultiplierActivationTime = Date.now(); playSound('scoreMultiplierPickup'); scoreMultipliers.splice(i, 1); updatePowerUpIndicators(); break; }}}
             if (!player) return; 
-            for (let i = alienBullets.length - 1; i >= 0; i--) { if (alienBullets[i].x < player.x + player.width && alienBullets[i].x + alienBullets[i].width > player.x && alienBullets[i].y < player.y + player.height && alienBullets[i].y + alienBullets[i].height > player.y) { alienBullets.splice(i, 1); lives--; updateLivesBoard(); playerHasLaser = false; isLaserBeamActive = false; if(player) player.color = playerNormalColor; currentLaserDuration = 0; updateLaserTimeBoard(); playSound('playerExplosion'); if (lives <= 0) { gameOver(); return; } break; }}
-            for (let i = chopperBombs.length - 1; i >= 0; i--) { const bomb = chopperBombs[i]; if (player && bomb.x < player.x + player.width && bomb.x + bomb.width > player.x && bomb.y < player.y + player.height && bomb.y + bomb.height > player.y) { chopperBombs.splice(i, 1); lives--; updateLivesBoard(); playerHasLaser = false; isLaserBeamActive = false; if(player) player.color = playerNormalColor; currentLaserDuration = 0; updateLaserTimeBoard(); playSound('playerExplosion'); if (lives <= 0) { gameOver(); return; } break; } let bombRemoved = false; if (Array.isArray(barriers)) { for (let bi = 0; bi < barriers.length; bi++) { if (!Array.isArray(barriers[bi])) continue; for (let s = barriers[bi].length - 1; s >= 0; s--) { const seg = barriers[bi][s]; if (seg.alive && bomb.x < seg.x + seg.width && bomb.x + bomb.width > seg.x && bomb.y < seg.y + seg.height && bomb.y + bomb.height > seg.y) { seg.alive = false; chopperBombs.splice(i,1); bombRemoved = true; playSound('barrierHit'); break;}} if (bombRemoved) break;}}}
+            for (let i = alienBullets.length - 1; i >= 0; i--) { if (alienBullets[i].x < player.x + player.width && alienBullets[i].x + alienBullets[i].width > player.x && alienBullets[i].y < player.y + player.height && alienBullets[i].y + alienBullets[i].height > player.y) { alienBullets.splice(i, 1); lives--; updateLivesBoard(); playerHasLaser = false; isLaserBeamActive = false; if(player) player.color = playerNormalColor; currentLaserDuration = 0; missedUfoCount = 0; playerFireRateBoostActive = false; isRandomDoubleShotActive = false; isScoreMultiplierActive = false; updatePowerUpIndicators(); playSound('playerExplosion'); if (lives <= 0) { gameOver(); return; } canvas.classList.add('shake'); setTimeout(() => canvas.classList.remove('shake'), 150); break; }}
+            for (let i = chopperBombs.length - 1; i >= 0; i--) { const bomb = chopperBombs[i]; if (player && bomb.x < player.x + player.width && bomb.x + bomb.width > player.x && bomb.y < player.y + player.height && bomb.y + bomb.height > player.y) { chopperBombs.splice(i, 1); lives--; updateLivesBoard(); playerHasLaser = false; isLaserBeamActive = false; if(player) player.color = playerNormalColor; currentLaserDuration = 0; missedUfoCount = 0; playerFireRateBoostActive = false; isRandomDoubleShotActive = false; isScoreMultiplierActive = false; updatePowerUpIndicators(); playSound('playerExplosion'); if (lives <= 0) { gameOver(); return; } canvas.classList.add('shake'); setTimeout(() => canvas.classList.remove('shake'), 150); break; } let bombRemoved = false; if (Array.isArray(barriers)) { for (let bi = 0; bi < barriers.length; bi++) { if (!Array.isArray(barriers[bi])) continue; for (let s = barriers[bi].length - 1; s >= 0; s--) { const seg = barriers[bi][s]; if (seg.alive && bomb.x < seg.x + seg.width && bomb.x + bomb.width > seg.x && bomb.y < seg.y + seg.height && bomb.y + bomb.height > seg.y) { seg.alive = false; chopperBombs.splice(i,1); bombRemoved = true; playSound('barrierHit'); break;}} if (bombRemoved) break;}}}
         }
 
         // --- GAME STATE & MESSAGES ---
         function showMessage(title, text, buttonText, onButtonClick) { messageTitle.textContent = title; messageText.innerHTML = text; const nB = messageButton.cloneNode(true); nB.textContent = buttonText; if (messageButton.parentNode) messageButton.parentNode.replaceChild(nB, messageButton); messageButton = nB; messageBox.style.display = 'block'; messageButton.onclick = () => { hideMessage(); if (onButtonClick) onButtonClick(); };}
         function hideMessage() { messageBox.style.display = 'none'; }
-        function showGameOverMessage() { if(finalScoreDisplay) finalScoreDisplay.textContent = score; showMessage("Game Over", `Final score: <span id="finalScore">${score}</span>`, "Restart", () => { score = 0; lives = 3; playerHasLaser = false; laserActivationTime = 0; currentLaserDuration = 0; updateScoreboard(); updateLivesBoard(); updateLaserTimeBoard(); initGame(); gameRunning = true; requestAnimationFrame(gameLoop); });}
-        function gameOver() { console.log("Game Over called"); if (!gameRunning && lives <=0 && messageBox.style.display === 'block') return; gameRunning = false; playerHasLaser = false; isLaserBeamActive = false; laserActivationTime = 0; currentLaserDuration = 0; updateLaserTimeBoard(); playSound('ufoFlyStop'); playSound('chopperFlyStop'); if(audioInitialized && invaderMoveSequence && invaderMoveSequence.state === "started") invaderMoveSequence.stop(); if(audioInitialized && Tone.Transport.state === "started") {Tone.Transport.stop(); Tone.Transport.cancel();} showGameOverMessage(); }
-        function gameWon() { console.log("Game Won called"); gameRunning = false; playerHasLaser = false; isLaserBeamActive = false; laserActivationTime = 0; currentLaserDuration = 0; updateLaserTimeBoard(); playSound('ufoFlyStop'); playSound('chopperFlyStop'); if(audioInitialized && invaderMoveSequence && invaderMoveSequence.state === "started") invaderMoveSequence.stop(); if(audioInitialized && Tone.Transport.state === "started") {Tone.Transport.stop(); Tone.Transport.cancel();} if(finalScoreDisplay) finalScoreDisplay.textContent = score; showMessage("You Win!", `Score: <span id="finalScore">${score}</span>`, "Play Again", () => { score = 0; lives = 3; updateScoreboard(); updateLivesBoard(); initGame(); gameRunning = true; requestAnimationFrame(gameLoop); });}
+        function showGameOverMessage() { if(finalScoreDisplay) finalScoreDisplay.textContent = score; showMessage("Game Over", `Final score: <span id="finalScore">${score}</span><br>Wave Reached: ${currentWave}`, "Restart", () => { score = 0; lives = 3; currentWave = 1; alienBaseSpeed = 0.5; currentAlienBulletSpeed = 3; playerHasLaser = false; laserActivationTime = 0; currentLaserDuration = 0; missedUfoCount = 0; playerFireRateBoostActive = false; isRandomDoubleShotActive = false; isScoreMultiplierActive = false; updateScoreboard(); updateLivesBoard(); updatePowerUpIndicators(); initGame(); gameRunning = true; requestAnimationFrame(gameLoop); });}
+        function gameOver() { gameRunning = false; playerHasLaser = false; isLaserBeamActive = false; laserActivationTime = 0; currentLaserDuration = 0; missedUfoCount = 0; playerFireRateBoostActive = false; isRandomDoubleShotActive = false; isScoreMultiplierActive = false; updatePowerUpIndicators(); playSound('ufoFlyStop'); playSound('chopperFlyStop'); if(audioInitialized && invaderMoveSequence && invaderMoveSequence.state === "started") invaderMoveSequence.stop(); if(audioInitialized && Tone.Transport.state === "started") {Tone.Transport.stop(); Tone.Transport.cancel();} showGameOverMessage(); }
+        function gameWon() { gameRunning = false; playerHasLaser = false; isLaserBeamActive = false; laserActivationTime = 0; currentLaserDuration = 0; missedUfoCount = 0; playerFireRateBoostActive = false; isRandomDoubleShotActive = false; isScoreMultiplierActive = false; updatePowerUpIndicators(); playSound('ufoFlyStop'); playSound('chopperFlyStop'); if(audioInitialized && invaderMoveSequence && invaderMoveSequence.state === "started") invaderMoveSequence.stop(); if(audioInitialized && Tone.Transport.state === "started") {Tone.Transport.stop(); Tone.Transport.cancel();} if(finalScoreDisplay) finalScoreDisplay.textContent = score; showMessage("You Win!", `Score: <span id="finalScore">${score}</span><br>Wave Cleared: ${currentWave}`, "Play Again", () => { score = 0; lives = 3; currentWave = 1; alienBaseSpeed = 0.5; currentAlienBulletSpeed = 3; updateScoreboard(); updateLivesBoard(); initGame(); gameRunning = true; requestAnimationFrame(gameLoop); });}
 
         // --- GAME LOOP ---
         function gameLoop() {
-            if (!gameRunning) { if (lives <= 0 && messageBox.style.display === 'none') gameOver(); else if (Array.isArray(invaders) && invaders.filter(inv => inv.alive).length === 0 && lives > 0 && messageBox.style.display === 'none' && gameRunning) gameWon(); requestAnimationFrame(gameLoop); return; }
+            if (!gameRunning) { 
+                // Only call gameOver or gameWon if the message isn't already displayed, to prevent loops
+                if (lives <= 0 && messageBox.style.display === 'none') gameOver(); 
+                // The wave clear logic is now handled within updateInvaders to ensure gameRunning is false before showing message
+                requestAnimationFrame(gameLoop); return; 
+            }
+            
+            const now = Date.now();
+            if (!playerHasLaser && !isRandomDoubleShotActive && now - lastRandomDoubleShotCheck > randomDoubleShotCheckInterval) { if (Math.random() < randomDoubleShotChance) { isRandomDoubleShotActive = true; randomDoubleShotActivationTime = now; playSound('powerUpActivate'); } lastRandomDoubleShotCheck = now; }
+            if (!isScoreMultiplierActive && scoreMultipliers.length === 0 && now - lastScoreMultiplierSpawnCheck > scoreMultiplierSpawnInterval) { if (Math.random() < scoreMultiplierSpawnChance) { scoreMultipliers.push(createScoreMultiplier()); } lastScoreMultiplierSpawnCheck = now; }
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            updatePlayer(); updateBullets(); updateLaserStatus(); 
-            updateInvaders(); updateUFO(); updateChopper(); 
+            updatePlayer(); updateBullets(); updatePowerUpsStatus(); 
+            updateInvaders(); updateUFO(); updateChopper(); updateScoreMultipliers(); 
             updateInvaderSoundTempo(); 
             if (!gameRunning) { requestAnimationFrame(gameLoop); return; } 
             if (isLaserBeamActive) checkLaserBeamCollisions();
             checkCollisions(); 
             if (!gameRunning) { requestAnimationFrame(gameLoop); return; } 
             drawPlayer(); drawInvaders(); drawBullets(); if (isLaserBeamActive) drawLaserBeam(); 
-            drawChopper(); drawChopperBombs(); 
+            drawChopper(); drawChopperBombs(); drawScoreMultipliers(); 
             drawBarriers(); drawUFO();
             requestAnimationFrame(gameLoop);
         }
@@ -356,35 +435,40 @@
         function handleFire() {
             if (gameRunning && player) {
                 if (playerHasLaser && !isLaserBeamActive) { isLaserBeamActive = true; laserBeamEndTime = Date.now() + laserBeamVisualDuration; playSound(currentLaserDuration === doubleLaserDuration ? 'doubleLaserShoot' : 'laserShoot'); 
-                } else if (!playerHasLaser && bullets.length < 3) { bullets.push(createBullet(player.x + player.width / 2 - bulletWidth / 2, player.y, normalBulletColor, -bulletSpeed)); playSound('playerShoot'); }
+                } else if (isRandomDoubleShotActive && !playerHasLaser) { 
+                    let currentMax = playerFireRateBoostActive ? maxBoostedBullets : maxNormalBullets;
+                    if (bullets.length < currentMax - 1) { 
+                        bullets.push(createBullet(player.x + player.width / 2 - bulletWidth / 2 - doubleShotBulletOffsetX, player.y, normalBulletColor, -bulletSpeed));
+                        bullets.push(createBullet(player.x + player.width / 2 - bulletWidth / 2 + doubleShotBulletOffsetX, player.y, normalBulletColor, -bulletSpeed));
+                        playSound('playerShoot'); 
+                    }
+                } else if (!playerHasLaser) { 
+                    let currentMax = playerFireRateBoostActive ? maxBoostedBullets : maxNormalBullets;
+                    if (bullets.length < currentMax) {
+                         bullets.push(createBullet(player.x + player.width / 2 - bulletWidth / 2, player.y, normalBulletColor, -bulletSpeed)); 
+                         playSound('playerShoot'); 
+                    }
+                }
             } else if (!gameRunning && messageBox.style.display === 'block' && messageButton.textContent.toLowerCase().includes("start")) {
-                console.log("Start button (via fire key/touch) clicked."); // DEBUG
                 if (!audioInitialized) initializeAudio(); 
                 messageButton.click(); 
             }
         }
-        window.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = true; if (e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); handleFire(); } if (!gameRunning && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && messageBox.style.display === 'block' && messageButton.textContent.toLowerCase().includes("start")) { console.log("Start button (via arrow key) clicked."); if (!audioInitialized) initializeAudio(); messageButton.click(); }}); // DEBUG
+        window.addEventListener('keydown', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = true; if (e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); handleFire(); } if (!gameRunning && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && messageBox.style.display === 'block' && messageButton.textContent.toLowerCase().includes("start")) { if (!audioInitialized) initializeAudio(); messageButton.click(); }}); 
         window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = false; });
         const tL = document.getElementById('touchLeft'), tR = document.getElementById('touchRight'), tF = document.getElementById('touchFire'), tCD = document.getElementById('touchControls');
-        if (('ontouchstart' in window) || (navigator.maxTouchPoints > 0)) { tCD.style.display = 'flex'; tL.addEventListener('touchstart', (e) => { e.preventDefault(); keys.ArrowLeft = true; }); tL.addEventListener('touchend', (e) => { e.preventDefault(); keys.ArrowLeft = false; }); tR.addEventListener('touchstart', (e) => { e.preventDefault(); keys.ArrowRight = true; }); tR.addEventListener('touchend', (e) => { e.preventDefault(); keys.ArrowRight = false; }); tF.addEventListener('touchstart', (e) => { e.preventDefault(); console.log("Touch fire initiated."); if (!audioInitialized) initializeAudio(); handleFire(); });} // DEBUG
+        if (('ontouchstart' in window) || (navigator.maxTouchPoints > 0)) { tCD.style.display = 'flex'; tL.addEventListener('touchstart', (e) => { e.preventDefault(); keys.ArrowLeft = true; }); tL.addEventListener('touchend', (e) => { e.preventDefault(); keys.ArrowLeft = false; }); tR.addEventListener('touchstart', (e) => { e.preventDefault(); keys.ArrowRight = true; }); tR.addEventListener('touchend', (e) => { e.preventDefault(); keys.ArrowRight = false; }); tF.addEventListener('touchstart', (e) => { e.preventDefault(); if (!audioInitialized) initializeAudio(); handleFire(); });} 
 
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas(); 
-        showMessage("Space Invaders", "Destroy UFO for Laser, Chopper for Double Laser!<br>Press Space/Fire or Move to Start!", "Start Game", () => {
-            console.log("Start Game button (initial message) clicked."); // DEBUG
-            if (!audioInitialized) {
-                console.log("Initializing audio from Start Game button callback..."); // DEBUG
-                initializeAudio();
-            } else {
-                console.log("Audio was already initialized before Start Game button callback."); // DEBUG
-            }
-            score = 0; lives = 3; playerHasLaser = false; laserActivationTime = 0; currentLaserDuration = 0;
-            console.log("Game state reset for new game."); // DEBUG
-            updateScoreboard(); updateLivesBoard(); updateLaserTimeBoard();
+        showMessage("Space Invaders", "Waves, Power-Ups & More!<br>Press Space/Fire or Move to Start!", "Start Game", () => {
+            if (!audioInitialized) initializeAudio(); 
+            score = 0; lives = 3; currentWave = 1; alienBaseSpeed = 0.5; currentAlienBulletSpeed = 3; 
+            playerHasLaser = false; laserActivationTime = 0; currentLaserDuration = 0;
+            missedUfoCount = 0; playerFireRateBoostActive = false; isRandomDoubleShotActive = false; isScoreMultiplierActive = false; 
+            updateScoreboard(); updateLivesBoard(); updatePowerUpIndicators();
             initGame(); 
-            console.log("initGame() completed from Start Game button callback."); // DEBUG
             gameRunning = true; 
-            console.log("gameRunning set to true, starting gameLoop."); // DEBUG
             requestAnimationFrame(gameLoop); 
         });
     </script>
