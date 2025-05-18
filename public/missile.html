@@ -50,13 +50,9 @@ let missiles = [];
 let enemyMissiles = [];
 let bombs = [];
 let explosions = [];
+let clouds = [];
 let score = 0;
 let gameOver = false;
-let level = 1;
-let missilesThisLevel = 0;
-let missilesLaunched = 0;
-let missileBaseSpeed = 0.55;
-let levelingUp = false;
 
 // Sound
 const sndLaunch = document.getElementById('sndLaunch');
@@ -123,6 +119,64 @@ for (let i = 0; i < NUM_CITIES; i++) {
     });
 }
 
+// Initialize clouds
+function initClouds() {
+    clouds = [];
+    for (let i = 0; i < 6; i++) {
+        clouds.push({
+            x: Math.random() * w,
+            y: 40 + Math.random() * 120,
+            speed: 0.2 + Math.random() * 0.15,
+            size: 40 + Math.random() * 40,
+            pattern: Array.from({length: 4 + Math.floor(Math.random() * 3)}, () => ({
+                dx: (Math.random() - 0.5) * 1.2,
+                dy: (Math.random() - 0.5) * 1.2,
+                rx: 0.3 + Math.random() * 0.7,
+                ry: 0.18 + Math.random() * 0.32
+            }))
+        });
+    }
+}
+
+function updateClouds() {
+    for (let c of clouds) {
+        c.x += c.speed;
+        if (c.x - c.size > w) {
+            c.x = -c.size;
+            c.y = 40 + Math.random() * 120;
+            c.speed = 0.2 + Math.random() * 0.15;
+            c.size = 40 + Math.random() * 40;
+            c.pattern = Array.from({length: 4 + Math.floor(Math.random() * 3)}, () => ({
+                dx: (Math.random() - 0.5) * 1.2,
+                dy: (Math.random() - 0.5) * 1.2,
+                rx: 0.3 + Math.random() * 0.7,
+                ry: 0.18 + Math.random() * 0.32
+            }));
+        }
+    }
+}
+
+function drawClouds() {
+    ctx.save();
+    for (let c of clouds) {
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        for (let p of c.pattern) {
+            ctx.ellipse(
+                c.x + p.dx * c.size,
+                c.y + p.dy * c.size,
+                c.size * p.rx,
+                c.size * p.ry,
+                0, 0, 2 * Math.PI
+            );
+        }
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1.0;
+    ctx.restore();
+}
+
 // Factory/cityscape drawing BETWEEN cities
 function drawCityBackground() {
     ctx.save();
@@ -158,19 +212,16 @@ function drawCityBackground() {
 
 function drawTitle() {
     ctx.save();
-    ctx.font = "40px 'Press Start 2P', monospace";
+    ctx.font = "64px 'Press Start 2P', monospace";
     ctx.fillStyle = "#0ff";
     ctx.textAlign = "center";
     ctx.fillText("ANAL COMMAND", w / 2, 90);
-    ctx.font = "22px 'Press Start 2P', monospace";
-    ctx.fillStyle = "#ff0";
-    ctx.fillText(`LEVEL ${level}`, w / 2, 130);
     ctx.restore();
 }
 
 function drawCities() {
     ctx.save();
-    ctx.font = "18px 'Press Start 2P', monospace";
+    ctx.font = "13px 'Press Start 2P', monospace";
     for (let i = 0; i < cities.length; i++) {
         if (cities[i].alive) {
             // City block
@@ -183,13 +234,13 @@ function drawCities() {
             ctx.fill();
         }
         // City name
-        ctx.font = "18px 'Press Start 2P', monospace";
+        ctx.font = "13px 'Press Start 2P', monospace";
         ctx.fillStyle = "#ff0";
         ctx.textAlign = "center";
         ctx.fillText(cities[i].name, cities[i].x, h - 15);
 
         // Missile number (UNDER city)
-        ctx.font = "18px 'Press Start 2P', monospace";
+        ctx.font = "13px 'Press Start 2P', monospace";
         ctx.fillStyle = cities[i].alive
           ? (cities[i].missiles > 0 ? "#0cf" : "#f33")
           : "#222";
@@ -251,7 +302,11 @@ function drawExplosions() {
         ctx.save();
         ctx.beginPath();
         ctx.arc(e.x, e.y, e.r, 0, 2 * Math.PI);
-        ctx.fillStyle = "rgba(255,255,255,0.4)";
+        if (e.color === 'player') {
+            ctx.fillStyle = "rgba(0,180,255,0.45)";
+        } else {
+            ctx.fillStyle = "rgba(255,255,255,0.4)";
+        }
         ctx.fill();
         ctx.restore();
     }
@@ -266,9 +321,6 @@ function drawGameOver() {
     ctx.font = "32px 'Press Start 2P', monospace";
     ctx.fillStyle = "#ff0";
     ctx.fillText("Score: " + score, w / 2, h / 2 + 60);
-    ctx.font = "28px 'Press Start 2P', monospace";
-    ctx.fillStyle = "#0ff";
-    ctx.fillText(`Level: ${level}`, w / 2, h / 2 + 110);
     ctx.restore();
 }
 
@@ -276,15 +328,13 @@ function drawGameOver() {
 function spawnEnemyMissile() {
     let aliveCities = cities.filter(c => c.alive);
     if (aliveCities.length === 0) return;
-    if (missilesLaunched >= missilesThisLevel) return;
     let target = aliveCities[Math.floor(Math.random() * aliveCities.length)];
     let x0 = Math.random() * w;
     let y0 = 0;
     let x1 = target.x;
     let y1 = h - 70;
-    let speed = missileBaseSpeed + (level - 1) * 0.06 + Math.random() * 0.35;
+    let speed = 0.25 + Math.random() * 0.35; // MUCH SLOWER INCOMING!
     enemyMissiles.push({ x0, y0, x: x0, y: y0, x1, y1, speed });
-    missilesLaunched++;
 }
 
 function spawnPlayerMissile(targetX, targetY) {
@@ -326,7 +376,7 @@ function updateMissiles() {
         let dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < m.speed) {
             // Explode
-            explosions.push({ x: m.x1, y: m.y1, r: 1, maxR: 50, frame: 0 });
+            explosions.push({ x: m.x1, y: m.y1, r: 1, maxR: 50, frame: 0, color: 'player' });
             playExplosionSound();
             missiles.splice(i, 1);
             continue;
@@ -413,23 +463,25 @@ function updateExplosions() {
     }
 }
 
-function startLevel(lv) {
-    level = lv;
-    if (level === 1) missilesThisLevel = 20;
-    else if (level === 2) missilesThisLevel = 35;
-    else if (level === 3) missilesThisLevel = 50;
-    else missilesThisLevel = 50 + (level - 3) * 15;
-    missilesLaunched = 0;
-}
-
 // Main loop
 function gameLoop() {
     ctx.clearRect(0, 0, w, h);
-    document.getElementById("score").innerHTML = `Score: ${score} | Level: ${level}`;
+    updateClouds();
+    // Show score and level at the top
+    ctx.save();
+    ctx.font = "18px 'Press Start 2P', monospace";
+    ctx.fillStyle = "#0090ff";
+    ctx.textAlign = "left";
+    ctx.fillText(`Score: ${score}`, 18, 32);
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#ff0";
+    ctx.fillText(`Level: ${typeof level !== 'undefined' ? level : 1}`, w - 18, 32);
+    ctx.restore();
     drawCityBackground();
     drawTitle();
     drawCities();
     drawMissiles();
+    drawClouds();
     drawBombs();
     drawExplosions();
     if (gameOver) {
@@ -443,15 +495,6 @@ function gameLoop() {
     if (!cities.some(c => c.alive)) {
         if (!gameOver) playLoseSound();
         gameOver = true;
-    }
-
-    // Level up check: all missiles for this level launched and none left on screen
-    if (!gameOver && !levelingUp && missilesLaunched >= missilesThisLevel && enemyMissiles.length === 0) {
-        levelingUp = true;
-        setTimeout(() => {
-            startLevel(level + 1);
-            levelingUp = false;
-        }, 1200);
     }
 
     requestAnimationFrame(gameLoop);
@@ -504,12 +547,13 @@ canvas.addEventListener('contextmenu', function(e) {
     score = 0;
     gameOver = false;
     lastBombTime = 0;
-    levelingUp = false;
-    startLevel(1);
+    initClouds();
     gameLoop();
 });
 
-startLevel(1);
+// After initializing cities, add:
+initClouds();
+
 gameLoop();
 </script>
 </body>
