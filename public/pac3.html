@@ -187,7 +187,7 @@
         const messageBox = document.getElementById('messageBox');
         const messageTitle = document.getElementById('messageTitle');
         const messageText = document.getElementById('messageText');
-        let messageButton = document.getElementById('messageButton'); // Changed const to let
+        let messageButton = document.getElementById('messageButton');
 
         // --- Audio Elements ---
         let audioInitialized = false;
@@ -195,44 +195,46 @@
             wakka: new Audio('wakka.mp3'),
             eatGhost: new Audio('eat_ghost.mp3'),
             death: new Audio('death.mp3'),
-            // You can add more sounds here, e.g., powerPellet: new Audio('power_pellet.mp3')
+            powerPellet: new Audio('power-pellet.mp3') // Added power pellet sound
         };
 
-        // Function to play sound
+        // Function to play non-looping sounds
         function playSound(soundName) {
-            if (!audioInitialized) return; // Don't play if audio not yet allowed by user interaction
+            if (!audioInitialized) return;
             const sound = sounds[soundName];
             if (sound) {
-                sound.currentTime = 0; // Rewind to start
+                sound.currentTime = 0;
                 sound.play().catch(error => console.warn(`Sound play failed for ${soundName}:`, error));
             } else {
                 console.warn(`Sound not found: ${soundName}`);
             }
         }
-        // Attempt to initialize (load) sounds. Playback will still require interaction.
+        // Initialize all sounds
         Object.values(sounds).forEach(sound => {
             sound.load();
-            sound.volume = 0.5; // Adjust volume as needed (0.0 to 1.0)
+            sound.volume = 0.3; // Adjusted volume for better balance
         });
+        if (sounds.wakka) { // Specific setup for wakka sound
+            sounds.wakka.loop = true;
+        }
 
 
         // Game Constants and Variables
-        const TILE_SIZE = 20; // Size of each tile in the maze
-        let currentMazeLayout; // Holds the layout for the current level (the array of numbers)
-        let mutableMaze; // Mutable copy of currentMazeLayout for tracking eaten pellets
+        const TILE_SIZE = 20;
+        let currentMazeLayout;
+        let mutableMaze;
         let pacman;
         let ghosts = [];
-        let pellets = []; // Array of pellet objects {x, y, type, gridX, gridY}
+        let pellets = [];
         let score = 0;
         let lives = 3;
         let gameRunning = false;
-        let frightenedMode = false; // Is Pac-Man powered up?
-        let frightenedTimer = 0; // How long power-up lasts
-        const FRIGHTENED_DURATION = 7000; // 7 seconds
-        let currentLevelIndex = 0; // Start at level 1 (index 0)
+        let frightenedMode = false;
+        let frightenedTimer = 0;
+        const FRIGHTENED_DURATION = 7000;
+        let currentLevelIndex = 0;
 
         // --- MAZE DEFINITIONS ---
-        // MAZE_LAYOUT_LEVEL_1: Original maze configuration
         const MAZE_LAYOUT_LEVEL_1 = {
             layout: [
                 [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1],
@@ -243,13 +245,13 @@
                 [1,2,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,2,1],
                 [1,2,2,2,2,1,2,2,2,2,2,2,2,1,2,2,2,2,1],
                 [1,1,1,1,2,1,1,1,1,2,1,1,1,1,2,1,1,1,1],
-                [1,1,1,1,2,1,1,1,4,2,2,2,2,2,2,1,0,0,0], // Ghost house (4), door (0), path (2)
+                [1,1,1,1,2,1,1,1,4,2,2,2,2,2,2,1,0,0,0],
                 [1,1,1,1,2,1,1,1,1,2,1,1,1,1,2,1,1,1,1],
-                [2,2,2,2,2,1,2,2,2,2,0,1,0,2,2,2,2,2,2], // Tunnel row
+                [2,2,2,2,2,1,2,2,2,2,0,1,0,2,2,2,2,2,2],
                 [1,1,1,1,2,1,0,1,1,1,1,1,0,1,2,1,1,1,1],
-                [2,2,2,2,2,1,0,0,2,5,0,0,0,1,2,2,2,2,2], // Pacman start (5), Tunnel row
+                [2,2,2,2,2,1,0,0,2,5,0,0,0,1,2,2,2,2,2],
                 [1,1,1,1,2,1,0,1,2,1,1,1,0,1,2,1,1,1,1],
-                [2,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,2], // Tunnel row
+                [2,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,2],
                 [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
                 [1,2,2,1,2,2,2,2,2,2,2,2,2,2,2,1,2,2,1],
                 [1,1,2,1,2,1,2,1,1,1,1,1,2,1,2,1,2,1,1],
@@ -258,14 +260,11 @@
                 [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
                 [1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1]
             ],
-            tunnelRows: [10, 12, 14], // Row indices (0-based) that contain tunnels
-            ghostDoorPos: { x: 9, y: 7 } // Grid coordinates of the ghost house door (tile type 0)
+            tunnelRows: [10, 12, 14],
+            ghostDoorPos: { x: 9, y: 7 }
         };
-
-        // --------------- START: PASTE YOUR LEVEL 2 MAZE ARRAY HERE ---------------
-        // IMPORTANT: Replace the 'layout', 'tunnelRows', and 'ghostDoorPos' with your actual Level 2 data.
-        const MAZE_LAYOUT_LEVEL_2 = {
-            layout: [ // THIS IS A PLACEHOLDER - REPLACE IT!
+        const MAZE_LAYOUT_LEVEL_2 = { // KEEP YOUR LEVEL 2 MAZE DATA HERE
+            layout: [
                 [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
                 [1,5,2,2,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,2,2,3,1],
                 [1,2,1,1,1,2,1,1,1,1,1,2,1,2,1,1,1,1,1,2,1,1,1,2,1],
@@ -288,81 +287,48 @@
             tunnelRows: [7],
             ghostDoorPos: { x: 12, y: 10 }
         };
-        // --------------- END: PASTE YOUR LEVEL 2 MAZE ARRAY HERE ---------------
-
         const allMazeConfigs = [MAZE_LAYOUT_LEVEL_1, MAZE_LAYOUT_LEVEL_2];
         let currentTunnelRows;
         let currentGhostDoorPos;
 
-
         function loadLevelConfig(levelIndex) {
-            if (levelIndex >= allMazeConfigs.length) {
-                console.warn("Attempted to load invalid level index:", levelIndex);
-                return false;
-            }
+            if (levelIndex >= allMazeConfigs.length) { return false; }
             const config = allMazeConfigs[levelIndex];
             currentMazeLayout = config.layout;
             currentTunnelRows = config.tunnelRows || [];
             currentGhostDoorPos = config.ghostDoorPos;
-
             if (!currentMazeLayout || currentMazeLayout.length === 0 || !currentMazeLayout[0] || currentMazeLayout[0].length === 0) {
-                console.error("Maze layout is invalid for level:", levelIndex, currentMazeLayout);
-                showMessage("Error", "Failed to load level data.<br>Maze layout is invalid.", "Restart", () => initGame(true));
-                return false;
+                showMessage("Error", "Invalid maze data.", "Restart", () => initGame(true)); return false;
             }
             if (!currentGhostDoorPos || typeof currentGhostDoorPos.x !== 'number' || typeof currentGhostDoorPos.y !== 'number') {
-                console.error("Ghost door position not properly defined for level:", levelIndex);
-                let foundDoor = false;
-                for (let r = 0; r < currentMazeLayout.length; r++) {
-                    for (let c = 0; c < currentMazeLayout[0].length; c++) {
-                        if (currentMazeLayout[r][c] === 0) {
-                            currentGhostDoorPos = { x: c, y: r };
-                            foundDoor = true; break;
-                        }
-                    }
-                    if (foundDoor) break;
-                }
-                if (!foundDoor) currentGhostDoorPos = { x: Math.floor(currentMazeLayout[0].length / 2) , y: Math.floor(currentMazeLayout.length / 2) -1 };
-                console.warn("Using fallback ghost door position:", currentGhostDoorPos);
+                currentGhostDoorPos = { x: Math.floor(currentMazeLayout[0].length / 2), y: Math.floor(currentMazeLayout.length / 2) - 1 };
             }
             return true;
         }
 
         function resizeCanvas() {
-            if (!currentMazeLayout || currentMazeLayout.length === 0 || !currentMazeLayout[0] || currentMazeLayout[0].length === 0) {
-                console.warn("Cannot resize canvas, maze layout is not ready.");
-                return;
-            }
+            if (!currentMazeLayout) return;
             const mazePixelWidth = currentMazeLayout[0].length * TILE_SIZE;
             const mazePixelHeight = currentMazeLayout.length * TILE_SIZE;
-
-            canvas.width = mazePixelWidth;
-            canvas.height = mazePixelHeight;
-
+            canvas.width = mazePixelWidth; canvas.height = mazePixelHeight;
             const containerWidth = document.getElementById('gameContainer').clientWidth * 0.9;
             const containerHeight = window.innerHeight * 0.65;
-
             const scale = Math.min(containerWidth / mazePixelWidth, containerHeight / mazePixelHeight, 1);
-
             canvas.style.width = (mazePixelWidth * scale) + 'px';
             canvas.style.height = (mazePixelHeight * scale) + 'px';
-
             const gameInfo = document.getElementById('gameInfo');
-            if (gameInfo) {
-                gameInfo.style.width = (mazePixelWidth * scale) + 'px';
-                gameInfo.style.maxWidth = (mazePixelWidth * scale) + 'px';
-            }
+            if (gameInfo) { gameInfo.style.width = (mazePixelWidth * scale) + 'px'; gameInfo.style.maxWidth = (mazePixelWidth * scale) + 'px';}
         }
         window.addEventListener('resize', resizeCanvas);
 
         class PacMan {
             constructor(x, y) {
-                this.x = x; this.y = y;
-                this.spawnX = x; this.spawnY = y;
+                this.x = x; this.y = y; this.spawnX = x; this.spawnY = y;
                 this.radius = TILE_SIZE / 2 - 2; this.speed = 2;
                 this.dx = 0; this.dy = 0; this.nextDx = 0; this.nextDy = 0;
                 this.mouthOpen = true; this.mouthAngle = 0.2 * Math.PI; this.mouthSpeed = 0.05 * Math.PI;
                 this.color = '#ff0';
+                this.isWakkaPlaying = false; // Flag for continuous wakka sound
             }
             draw() {
                 ctx.fillStyle = this.color; ctx.beginPath();
@@ -377,12 +343,10 @@
                 const onGridYStrict = (this.y % TILE_SIZE === 0);
                 if (this.nextDx !== 0 || this.nextDy !== 0) {
                     if (this.nextDx !== 0 && onGridYStrict) {
-                        const checkY = this.y / TILE_SIZE;
-                        const checkX = Math.floor((this.x + this.nextDx * TILE_SIZE) / TILE_SIZE);
+                        const checkY = this.y / TILE_SIZE; const checkX = Math.floor((this.x + this.nextDx * TILE_SIZE) / TILE_SIZE);
                         if (!this.isWall(checkX, checkY, true)) { this.dx = this.nextDx; this.dy = 0; this.nextDx = 0; this.nextDy = 0; }
                     } else if (this.nextDy !== 0 && onGridXStrict) {
-                        const checkX = this.x / TILE_SIZE;
-                        const checkY = Math.floor((this.y + this.nextDy * TILE_SIZE) / TILE_SIZE);
+                        const checkX = this.x / TILE_SIZE; const checkY = Math.floor((this.y + this.nextDy * TILE_SIZE) / TILE_SIZE);
                         if (!this.isWall(checkX, checkY, true)) { this.dx = 0; this.dy = this.nextDy; this.nextDx = 0; this.nextDy = 0; }
                     }
                 }
@@ -398,6 +362,20 @@
                     if (!this.isWall(currentTileX, nextWallCheckY, false)) this.y = targetY;
                     else this.y = Math.round(this.y / TILE_SIZE) * TILE_SIZE;
                 }
+
+                // Continuous Wakka Sound Logic
+                if (this.dx !== 0 || this.dy !== 0) { // If Pac-Man is moving
+                    if (!this.isWakkaPlaying && audioInitialized && sounds.wakka) {
+                        sounds.wakka.play().catch(error => console.warn('Wakka play failed:', error));
+                        this.isWakkaPlaying = true;
+                    }
+                } else { // If Pac-Man is not moving
+                    if (this.isWakkaPlaying && sounds.wakka) {
+                        sounds.wakka.pause();
+                        this.isWakkaPlaying = false;
+                    }
+                }
+
                 const characterGridY = Math.floor(this.y / TILE_SIZE);
                 const characterPixelYOnGrid = characterGridY * TILE_SIZE;
                 const isVerticallyAlignedForTunnel = (Math.abs(this.y - characterPixelYOnGrid) < this.speed);
@@ -430,9 +408,9 @@
                         pellets = pellets.filter(p => !(p.gridX === gridX && p.gridY === gridY));
                         score += (tile === 2 ? 10 : 50);
                         updateScoreboard();
-                        if (tile === 2) playSound('wakka'); // Play wakka for normal pellet
+                        // Wakka sound is now continuous while moving, so no specific play here for tile === 2
                         if (tile === 3) {
-                            // playSound('powerPellet'); // Optional: Add a specific sound for power pellets
+                            playSound('powerPellet'); // Play sound for power pellet
                             frightenedMode = true; frightenedTimer = FRIGHTENED_DURATION;
                             ghosts.forEach(g => g.enterFrightenedMode());
                         }
@@ -440,9 +418,15 @@
                     }
                 }
             }
+            stopWakkaSound() { // Helper to stop wakka sound
+                if (this.isWakkaPlaying && sounds.wakka) {
+                    sounds.wakka.pause();
+                    this.isWakkaPlaying = false;
+                }
+            }
         }
 
-        class Ghost {
+        class Ghost { // Ghost class remains largely the same as previous version
             constructor(x, y, color) {
                 this.x = x; this.y = y; this.spawnX = x; this.spawnY = y;
                 this.radius = TILE_SIZE / 2 - 3; this.speed = 1.8;
@@ -615,7 +599,6 @@
                 }
             }
             if (pacmanSpawnPos.x === -1) {
-                console.warn("PacMan spawn (5) not found. Placing at default/first empty.");
                 let foundEmpty = false;
                 for (let r = 0; r < currentMazeLayout.length; r++) {
                     for (let c = 0; c < currentMazeLayout[0].length; c++) {
@@ -626,7 +609,6 @@
             }
             pacman = new PacMan(pacmanSpawnPos.x, pacmanSpawnPos.y);
             if (ghostSpawnCoords.length === 0) {
-                console.warn("Ghost spawn (4) not found. Spawning near door.");
                 for(let i=0; i < ghostColors.length; i++) {
                     ghostSpawnCoords.push({ x: currentGhostDoorPos.x * TILE_SIZE + (i%2===0 ? -TILE_SIZE:TILE_SIZE), y: (currentGhostDoorPos.y + 1 + Math.floor(i/2)) * TILE_SIZE });
                 }
@@ -672,7 +654,7 @@
             messageButton = newButton;
             messageButton.onclick = () => {
                 hideMessage();
-                if (!audioInitialized) audioInitialized = true; // Allow sounds after first interaction
+                if (!audioInitialized) audioInitialized = true;
                 if (onButtonClick) onButtonClick();
             };
         }
@@ -683,6 +665,8 @@
             pacman.x = pacman.spawnX; pacman.y = pacman.spawnY;
             pacman.dx = 0; pacman.dy = 0; pacman.nextDx = 0; pacman.nextDy = 0;
             pacman.mouthAngle = 0.2 * Math.PI;
+            pacman.stopWakkaSound(); // Stop wakka sound on reset
+
             ghosts.forEach(g => {
                 g.x = g.spawnX; g.y = g.spawnY; g.isFrightened = false; g.isEaten = false;
                 g.isInsideHouse = true; g.dx = 0; g.dy = -1;
@@ -700,8 +684,9 @@
                 const distance = Math.sqrt(distX * distX + distY * distY);
                 if (distance < pacman.radius + ghost.radius - (TILE_SIZE * 0.2)) {
                     if (ghost.isFrightened) {
-                        ghost.getEaten(); // Sound is played within getEaten
+                        ghost.getEaten();
                     } else {
+                        pacman.stopWakkaSound(); // Stop wakka on death
                         playSound('death');
                         lives--; updateLivesBoard(); gameRunning = false;
                         if (lives <= 0) gameOver();
@@ -717,6 +702,7 @@
 
         function startGameFlow(isInitialStart = false) {
             if (!loadLevelConfig(currentLevelIndex)) {
+                if (pacman) pacman.stopWakkaSound();
                 showMessage("YOU WIN!", `Congratulations! You beat all ${allMazeConfigs.length} levels!<br>Final Score: ${score}`, "Play Again From Level 1", () => {
                     currentLevelIndex = 0; score = 0; lives = 3;
                     initGame(true);
@@ -731,16 +717,21 @@
 
         function initGame(isNewFullGame = false) {
             if (isNewFullGame || lives <= 0) { score = 0; lives = 3; currentLevelIndex = 0; }
+            if (pacman) pacman.stopWakkaSound(); // Ensure wakka is stopped before starting a new game/level
             startGameFlow(isNewFullGame);
         }
 
         function gameOver() {
-            gameRunning = false; finalScoreDisplay.textContent = score;
+            gameRunning = false;
+            if (pacman) pacman.stopWakkaSound(); // Stop wakka on game over
+            finalScoreDisplay.textContent = score;
             showMessage("Game Over", `Your final score: ${score}<br>Reached Level: ${currentLevelIndex + 1}`, "Restart Game", () => initGame(true));
         }
 
-        function gameWon() {
-            gameRunning = false; currentLevelIndex++;
+        function gameWon() { // Called when all pellets on current level are eaten
+            gameRunning = false;
+            if (pacman) pacman.stopWakkaSound(); // Stop wakka when level is won
+            currentLevelIndex++;
             if (currentLevelIndex < allMazeConfigs.length) {
                 showMessage(`Level ${currentLevelIndex} Cleared!`, `Score: ${score}<br>Get Ready for Level ${currentLevelIndex + 1}!`, "Next Level", () => startGameFlow(false));
             } else {
@@ -752,13 +743,13 @@
         function gameLoop(timestamp) {
             if (!gameRunning && messageBox.style.display !== 'none') { requestAnimationFrame(gameLoop); return; }
             if (!gameRunning && messageBox.style.display === 'none' && lives > 0) { requestAnimationFrame(gameLoop); return; }
-            if (!currentMazeLayout || !pacman) { console.warn("Loop before init."); requestAnimationFrame(gameLoop); return; }
+            if (!currentMazeLayout || !pacman) { requestAnimationFrame(gameLoop); return; }
 
             const deltaTime = timestamp - lastTime; lastTime = timestamp;
             const effectiveDeltaTime = Math.min(deltaTime, 100);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             drawMaze(); drawPellets();
-            pacman.update(); pacman.draw();
+            pacman.update(); pacman.draw(); // Pacman update now handles its own wakka sound
             ghostUpdateTimer += effectiveDeltaTime;
             if(ghostUpdateTimer >= GHOST_UPDATE_INTERVAL){ ghosts.forEach(ghost => ghost.update()); ghostUpdateTimer = 0; }
             ghosts.forEach(ghost => ghost.draw());
@@ -795,7 +786,7 @@
                 if (messageBox.style.display !== 'none') {
                     messageButton.click(); return;
                 }
-                if (!audioInitialized) audioInitialized = true; // Also allow sounds on touch interaction
+                if (!audioInitialized) audioInitialized = true;
                 if (gameRunning && pacman) pacman.setDirection(dx, dy);
             };
             document.getElementById('touchUp').addEventListener('click', () => handleTouchControl(0, -1));
@@ -805,7 +796,6 @@
         }
 
         showMessage("Pac-Man", "Use Arrow Keys or Tap Controls to Move.<br>Eat all pellets to win!", "Start Game", () => {
-            // audioInitialized is set to true here, after the first user click.
             initGame(true);
         });
     </script>
