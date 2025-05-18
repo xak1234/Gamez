@@ -57,6 +57,8 @@ let missilesThisLevel = 0;
 let missilesLaunched = 0;
 let missileBaseSpeed = 0.55;
 let levelingUp = false;
+let clouds = [];
+const NUM_CLOUDS = 5;
 
 // Sound
 const sndLaunch = document.getElementById('sndLaunch');
@@ -422,12 +424,84 @@ function startLevel(lv) {
     missilesLaunched = 0;
 }
 
+function randomCloudShape(cx, cy, scale) {
+    // Generate an irregular cloud shape as an array of points
+    let points = [];
+    let n = 7 + Math.floor(Math.random() * 4); // 7-10 points
+    let baseR = 28 * scale + Math.random() * 10 * scale;
+    for (let i = 0; i < n; i++) {
+        let angle = (i / n) * 2 * Math.PI;
+        let r = baseR + Math.random() * 12 * scale;
+        let x = cx + Math.cos(angle) * r;
+        let y = cy + Math.sin(angle) * (r * (0.6 + Math.random() * 0.3));
+        points.push({x, y});
+    }
+    return points;
+}
+
+function spawnCloud() {
+    let y = 60 + Math.random() * 120;
+    let scale = 0.8 + Math.random() * 0.7;
+    let speed = 0.12 + Math.random() * 0.08;
+    let x = Math.random() < 0.5 ? -80 : w + 80;
+    let dir = x < 0 ? 1 : -1;
+    let shape = randomCloudShape(0, 0, scale);
+    return { x, y, speed, dir, shape, scale, alpha: 0.7 + Math.random() * 0.2 };
+}
+
+for (let i = 0; i < NUM_CLOUDS; i++) {
+    clouds.push(spawnCloud());
+}
+
+function updateClouds() {
+    for (let c of clouds) {
+        c.x += c.speed * c.dir;
+    }
+    // Respawn clouds that go off screen
+    for (let i = 0; i < clouds.length; i++) {
+        if ((clouds[i].dir === 1 && clouds[i].x > w + 100) || (clouds[i].dir === -1 && clouds[i].x < -100)) {
+            clouds[i] = spawnCloud();
+            clouds[i].dir = Math.random() < 0.5 ? 1 : -1;
+            clouds[i].x = clouds[i].dir === 1 ? -80 : w + 80;
+        }
+    }
+}
+
+function drawClouds() {
+    ctx.save();
+    for (let c of clouds) {
+        ctx.globalAlpha = c.alpha;
+        ctx.beginPath();
+        let first = true;
+        for (let pt of c.shape) {
+            let px = c.x + pt.x;
+            let py = c.y + pt.y;
+            if (first) {
+                ctx.moveTo(px, py);
+                first = false;
+            } else {
+                ctx.lineTo(px, py);
+            }
+        }
+        ctx.closePath();
+        ctx.fillStyle = '#fff';
+        ctx.shadowColor = '#ddeeff';
+        ctx.shadowBlur = 16;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1.0;
+    }
+    ctx.restore();
+}
+
 // Main loop
 function gameLoop() {
     ctx.clearRect(0, 0, w, h);
     document.getElementById("score").innerHTML = `Score: ${score} | Level: ${level}`;
     drawCityBackground();
     drawTitle();
+    updateClouds();
+    drawClouds();
     drawCities();
     drawMissiles();
     drawBombs();
