@@ -36,6 +36,7 @@
 <audio id="sndLaunch" src="https://cdn.pixabay.com/audio/2022/07/26/audio_12ccefa48c.mp3" preload="auto"></audio>
 <audio id="sndExplosion" src="https://cdn.pixabay.com/audio/2022/07/26/audio_123ef6f88d.mp3" preload="auto"></audio>
 <audio id="sndLose" src="https://cdn.pixabay.com/audio/2022/07/26/audio_124b6a3a44.mp3" preload="auto"></audio>
+<audio id="sndMushroom" src="missbfd.mp3" preload="auto"></audio>
 <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -58,12 +59,13 @@ let missilesLaunched = 0;
 let missileBaseSpeed = 0.55;
 let levelingUp = false;
 let clouds = [];
-const NUM_CLOUDS = 5;
+const NUM_CLOUDS = 8;
 
 // Sound
 const sndLaunch = document.getElementById('sndLaunch');
 const sndExplosion = document.getElementById('sndExplosion');
 const sndLose = document.getElementById('sndLose');
+const sndMushroom = document.getElementById('sndMushroom');
 
 // Procedural sound functions using Web Audio API
 function playLaunchSound() {
@@ -425,28 +427,38 @@ function startLevel(lv) {
 }
 
 function randomCloudShape(cx, cy, scale) {
-    // Generate an irregular cloud shape as an array of points
+    // Generate a more irregular, fluffy cloud shape
     let points = [];
-    let n = 7 + Math.floor(Math.random() * 4); // 7-10 points
-    let baseR = 28 * scale + Math.random() * 10 * scale;
+    let n = 8 + Math.floor(Math.random() * 6); // 8-13 points
+    let baseR = 32 * scale + Math.random() * 18 * scale;
     for (let i = 0; i < n; i++) {
         let angle = (i / n) * 2 * Math.PI;
-        let r = baseR + Math.random() * 12 * scale;
+        let r = baseR + Math.random() * 18 * scale * (Math.random() < 0.5 ? 1 : -1);
         let x = cx + Math.cos(angle) * r;
-        let y = cy + Math.sin(angle) * (r * (0.6 + Math.random() * 0.3));
+        let y = cy + Math.sin(angle) * (r * (0.5 + Math.random() * 0.5));
         points.push({x, y});
     }
-    return points;
+    // Add some random small circles for extra fluff
+    let fluff = [];
+    let fluffCount = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < fluffCount; i++) {
+        let fx = cx + (Math.random() - 0.5) * baseR * 1.5;
+        let fy = cy + (Math.random() - 0.5) * baseR * 0.8;
+        let fr = (8 + Math.random() * 12) * scale;
+        fluff.push({fx, fy, fr});
+    }
+    return {points, fluff};
 }
 
 function spawnCloud() {
-    let y = 60 + Math.random() * 120;
-    let scale = 0.8 + Math.random() * 0.7;
-    let speed = 0.12 + Math.random() * 0.08;
-    let x = Math.random() < 0.5 ? -80 : w + 80;
+    let y = 40 + Math.random() * 180;
+    let scale = 0.7 + Math.random() * 1.2;
+    let speed = 0.07 + Math.random() * 0.13;
+    let x = Math.random() < 0.5 ? -120 : w + 120;
     let dir = x < 0 ? 1 : -1;
     let shape = randomCloudShape(0, 0, scale);
-    return { x, y, speed, dir, shape, scale, alpha: 0.7 + Math.random() * 0.2 };
+    let alpha = 0.45 + Math.random() * 0.35;
+    return { x, y, speed, dir, shape, scale, alpha };
 }
 
 for (let i = 0; i < NUM_CLOUDS; i++) {
@@ -471,9 +483,10 @@ function drawClouds() {
     ctx.save();
     for (let c of clouds) {
         ctx.globalAlpha = c.alpha;
+        // Main cloud shape
         ctx.beginPath();
         let first = true;
-        for (let pt of c.shape) {
+        for (let pt of c.shape.points) {
             let px = c.x + pt.x;
             let py = c.y + pt.y;
             if (first) {
@@ -486,10 +499,83 @@ function drawClouds() {
         ctx.closePath();
         ctx.fillStyle = '#fff';
         ctx.shadowColor = '#ddeeff';
-        ctx.shadowBlur = 16;
+        ctx.shadowBlur = 18;
         ctx.fill();
         ctx.shadowBlur = 0;
+        // Fluff balls
+        for (let f of c.shape.fluff) {
+            ctx.beginPath();
+            ctx.arc(c.x + f.fx, c.y + f.fy, f.fr, 0, 2 * Math.PI);
+            ctx.fillStyle = '#f8f8ff';
+            ctx.globalAlpha = c.alpha * 0.7;
+            ctx.fill();
+        }
         ctx.globalAlpha = 1.0;
+    }
+    ctx.restore();
+}
+
+// Mushroom cloud effect
+let mushroomCloud = null;
+function startMushroomCloud() {
+    mushroomCloud = {
+        y: h,
+        progress: 0,
+        maxProgress: 120,
+        baseR: 60,
+        stemW: 38,
+        stemH: 0
+    };
+    if (sndMushroom) {
+        sndMushroom.currentTime = 0;
+        sndMushroom.play();
+    }
+}
+
+function updateMushroomCloud() {
+    if (!mushroomCloud) return;
+    if (mushroomCloud.progress < mushroomCloud.maxProgress) {
+        mushroomCloud.progress++;
+        mushroomCloud.y = h - (h * (mushroomCloud.progress / mushroomCloud.maxProgress));
+        mushroomCloud.stemH = Math.min(h * 0.5, mushroomCloud.stemH + 6);
+    }
+}
+
+function drawMushroomCloud() {
+    if (!mushroomCloud) return;
+    ctx.save();
+    let centerX = w / 2;
+    let baseY = mushroomCloud.y + mushroomCloud.stemH;
+    // Stem
+    ctx.beginPath();
+    ctx.ellipse(centerX, baseY - mushroomCloud.stemH / 2, mushroomCloud.stemW, mushroomCloud.stemH / 2, 0, 0, 2 * Math.PI);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.shadowColor = '#fff';
+    ctx.shadowBlur = 24;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // Cap
+    ctx.beginPath();
+    ctx.ellipse(centerX, mushroomCloud.y, mushroomCloud.baseR * 2.2, 70, 0, Math.PI * 1.1, Math.PI * 1.9, false);
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.shadowColor = '#fff';
+    ctx.shadowBlur = 32;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // Cap shading
+    ctx.beginPath();
+    ctx.ellipse(centerX, mushroomCloud.y + 10, mushroomCloud.baseR * 1.7, 32, 0, 0, 2 * Math.PI);
+    ctx.fillStyle = 'rgba(220,220,220,0.5)';
+    ctx.fill();
+    // Fluffy edges
+    for (let i = 0; i < 7; i++) {
+        let angle = Math.PI * (0.7 + 0.6 * (i / 6));
+        let rx = Math.cos(angle) * mushroomCloud.baseR * 2.2;
+        let ry = Math.sin(angle) * 70;
+        ctx.beginPath();
+        ctx.arc(centerX + rx, mushroomCloud.y + ry, 18 + Math.random() * 10, 0, 2 * Math.PI);
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.fill();
     }
     ctx.restore();
 }
@@ -508,6 +594,8 @@ function gameLoop() {
     drawExplosions();
     if (gameOver) {
         drawGameOver();
+        updateMushroomCloud();
+        drawMushroomCloud();
         return;
     }
     updateMissiles();
@@ -515,7 +603,10 @@ function gameLoop() {
 
     // Lose check
     if (!cities.some(c => c.alive)) {
-        if (!gameOver) playLoseSound();
+        if (!gameOver) {
+            playLoseSound();
+            startMushroomCloud();
+        }
         gameOver = true;
     }
 
@@ -579,6 +670,7 @@ canvas.addEventListener('contextmenu', function(e) {
     gameOver = false;
     lastBombTime = 0;
     levelingUp = false;
+    mushroomCloud = null;
     startLevel(1);
     gameLoop();
 });
