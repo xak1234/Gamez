@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Anal Command</title>
+    <style>
+        body {
+            background: #000;
+            color: #0ff;
+            font-family: 'Press Start 2P', monospace, sans-serif;
+            margin: 0;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            /* Remove background color since we're using an image */
+        }
+        #score {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 30px;
+            color: #0090ff;
+            letter-spacing: 3px;
+            font-family: 'Press Start 2P', monospace, sans-serif;
+            text-shadow: 1px 1px #111, 0 0 8px #22f;
+            /* Make score more visible over the background image */
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 5px 15px;
+            border-radius: 10px;
+        }
+        /* Responsive styles */
+        @media screen and (max-width: 800px) {
+            #score {
+                font-size: 20px;
+                padding: 3px 10px;
+            }
+        }
+        html, body {
+            height: 100%;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+<div id="score"></div>
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+<audio id="sndLaunch" src="https://cdn.pixabay.com/audio/2022/07/26/audio_12ccefa48c.mp3" preload="auto"></audio>
+<audio id="sndExplosion" src="https://cdn.pixabay.com/audio/2022/07/26/audio_123ef6f88d.mp3" preload="auto"></audio>
+<audio id="sndLose" src="https://cdn.pixabay.com/audio/2022/07/26/audio_124b6a3a44.mp3" preload="auto"></audio>
+<audio id="sndMushroom" src="missbfd.mp3" preload="auto"></audio>
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let w = canvas.width, h = canvas.height;
+let isMobile = false;
+
+// Make canvas responsive
+function resizeCanvas() {
+    // Detect mobile devices
+    isMobile = window.innerWidth < 800 || 
+               /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+        // On mobile, make canvas fill the screen width
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    } else {
+        // On desktop, keep original dimensions
+        canvas.width = 800;
+        canvas.height = 600;
+    }
+    
+    // Update width and height variables
+    w = canvas.width;
+    h = canvas.height;
+    
+    // Update launcher positions based on new canvas width
+    LAUNCHER_POS.length = 0;
+    const spacing = w / (NUM_CITIES + 1);
+    for (let i = 0; i < NUM_CITIES; i++) {
+        LAUNCHER_POS.push(spacing * (i + 1));
+    }
+    
+    // Update city positions
+    for (let i = 0; i < cities.length; i++) {
+        cities[i].x = LAUNCHER_POS[i];
+    }
+}
+
+// Call resize on page load and window resize
+window.addEventListener('load', resizeCanvas);
+window.addEventListener('resize', resizeCanvas);
+
+// Preload background image
+const bgImage = new Image();
+bgImage.src = 'city.jpg';
+
+const CITY_NAMES = ["LEEDS", "YORK", "MANCHESTER", "ROTHERHAM", "BRADFORD"];
+const NUM_CITIES = CITY_NAMES.length;
+const LAUNCHER_POS = [100, 250, 400, 550, 700];
+const MISSILES_PER_CITY = 50;
+let cities = [];
+let missiles = [];
+let enemyMissiles = [];
+let bombs = [];
+let explosions = [];
+let score = 0;
+let gameOver = false;
+let level = 1;
+let missilesThisLevel = 0;
+let missilesLaunched = 0;
+let missileBaseSpeed = 0.55;
+let levelingUp = false;
+let clouds = [];
+const NUM_CLOUDS = 8;
+let supplyDropThisLevel = false; // Track if a supply drop has happened this level
+
+// Sound
+const sndLaunch = document.getElementById('sndLaunch');
+const sndExplosion = document.getElementById('sndExplosion');
+const sndLose = document.getElementById('sndLose');
+const sndMushroom = document.getElementById('sndMushroom');
+
+// Procedural sound functions using Web Audio API
+function playLaunchSound() {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(220, ctx.currentTime);
+    o.frequency.linearRampToValueAtTime(660, ctx.currentTime + 0.15);
+    g.gain.setValueAtTime(0.2, ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+    o.connect(g).connect(ctx.destination);
+    o.start();
+    o.stop(ctx.currentTime + 0.15);
+    o.onended = () => ctx.close();
+}
+
+// Deafening boom for city destruction
+function playCityExplosionSound() {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // Create powerful noise for explosion
+    const bufferSize = 8192;
+    const noise = ctx.createBufferSource();
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const output = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+    }
+    noise.buffer = buffer;
+    
+    // Create low oscillator for bass rumble
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(40, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(20, ctx.currentTime + 0.8);
+    
+    // Create filter for more realistic explosion
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(800, ctx.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 1.5);
+    
+    // Main gain control
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(0.9, ctx.currentTime); // Louder!
+    masterGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.5);
+    
+    // Oscillator gain
+    const oscGain = ctx.createGain();
+    oscGain.gain.setValueAtTime(0.8, ctx.currentTime);
+    oscGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.2);
+    
+    // Noise gain
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.8, ctx.currentTime);
+    noiseGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.9);
+    
+    // Connect everything
+    noise.connect(filter);
+    filter.connect(noiseGain);
+    noiseGain.connect(masterGain);
+    
+    osc.connect(oscGain);
+    oscGain.connect(masterGain);
+    
+    masterGain.connect(ctx.destination);
+    
+    // Start and stop
+    noise.start();
+    osc.start();
+    noise.stop(ctx.currentTime + 1.5);
+    osc.stop(ctx.currentTime + 1.5);
+    
+    // Clean up
+    noise.onended = () => ctx.close();
+}
+
+function playExplosionSound() {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const bufferSize = 4096;
+    const noise = ctx.createBufferSource();
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const output = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+    }
+    noise.buffer = buffer;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.5, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+    noise.connect(g).connect(ctx.destination);
+    noise.start();
+    noise.stop(ctx.currentTime + 0.4);
+    noise.onended = () => ctx.close();
+}
+
+function playLoseSound() {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'square';
+    o.frequency.setValueAtTime(220, ctx.currentTime);
+    o.frequency.linearRampToValueAtTime(110, ctx.currentTime + 0.6);
+    g.gain.setValueAtTime(0.3, ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.6);
+    o.connect(g).connect(ctx.destination);
+    o.start();
+    o.stop(ctx.currentTime + 0.6);
+    o.onended = () => ctx.close();
+}
+
+// City positions (with missile count)
+// Cities will be initialized after canvas is resized
+function initCities() {
+    cities = [];
+    for (let i = 0; i < NUM_CITIES; i++) {
+        cities.push({
+            name: CITY_NAMES[i],
+            x: LAUNCHER_POS[i],
+            alive: true,
+            missiles: MISSILES_PER_CITY
+        });
+    }
+}
+
+// Factory/cityscape drawing BETWEEN cities
+function drawCityBackground() {
+    ctx.save();
+    // Draw factory elements BETWEEN cities
+    for (let i = 0; i < cities.length - 1; i++) {
+        let x = (cities[i].x + cities[i+1].x) / 2;
+        // Big smokestack
+        ctx.fillStyle = "#444";
+        ctx.fillRect(x - 10, h - 130, 18, 80);
+        // Big factory block
+        ctx.fillStyle = "#222";
+        ctx.fillRect(x - 32, h - 70, 60, 35);
+        // Warehouse front
+        ctx.fillStyle = "#555";
+        ctx.fillRect(x - 22, h - 40, 44, 20);
+        // Windows/lights
+        ctx.fillStyle = "#ffd700";
+        for (let k = 0; k < 5; k++) {
+            ctx.fillRect(x - 28 + k * 12, h - 60, 6, 10);
+        }
+        // Chimney smoke (cartoon)
+        ctx.beginPath();
+        ctx.arc(x, h - 140, 10, 0, 2 * Math.PI);
+        ctx.fillStyle = "rgba(200,200,200,0.22)";
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x + 7, h - 152, 7, 0, 2 * Math.PI);
+        ctx.fillStyle = "rgba(210,210,210,0.14)";
+        ctx.fill();
+    }
+    ctx.restore();
+}
+
+function drawTitle() {
+    ctx.save();
+    
+    // Add a semi-transparent background behind the title for readability
+    ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+    ctx.fillRect(w/2 - 240, 55, 480, 50);
+    
+    ctx.font = "40px 'Press Start 2P', monospace";
+    ctx.fillStyle = "#0ff";
+    ctx.textAlign = "center";
+    ctx.fillText("YORKSHIRE COMMAND", w / 2, 90);
+    
+    // Add glow effect
+    ctx.shadowColor = "#0ff";
+    ctx.shadowBlur = 10;
+    ctx.fillText("YORKSHIRE COMMAND", w / 2, 90);
+    
+    ctx.restore();
+}
+
+function drawCities() {
+    ctx.save();
+    
+    // Calculate base city position (always at bottom of screen)
+    const cityBaseY = h - 70;
+    const launcherY = cityBaseY - 5;
+    const nameY = h - 15;
+    const missileCountY = h - 5;
+    
+    ctx.font = "18px 'Press Start 2P', monospace";
+    for (let i = 0; i < cities.length; i++) {
+        if (cities[i].alive) {
+            // City block
+            ctx.fillStyle = "#0cf";
+            ctx.fillRect(cities[i].x - 25, cityBaseY, 50, 40);
+            // Launcher
+            ctx.fillStyle = "#fa3";
+            ctx.beginPath();
+            ctx.arc(cities[i].x, launcherY, 12, Math.PI, 0);
+            ctx.fill();
+            
+            // Only show city name if city is alive
+            ctx.font = "13px 'Press Start 2P', monospace"; // 30% smaller font
+            ctx.fillStyle = "#ff0";
+            ctx.textAlign = "center";
+            ctx.fillText(cities[i].name, cities[i].x, nameY);
+            
+            // Missile number (UNDER city)
+            ctx.font = "18px 'Press Start 2P', monospace";
+            ctx.fillStyle = cities[i].missiles > 0 ? "#0cf" : "#f33";
+            ctx.fillText("▲ " + cities[i].missiles, cities[i].x, missileCountY);
+        } else {
+            // For destroyed cities, show ruins indication
+            ctx.fillStyle = "#444";
+            ctx.beginPath();
+            ctx.moveTo(cities[i].x - 20, cityBaseY + 40);
+            ctx.lineTo(cities[i].x - 10, cityBaseY + 30);
+            ctx.lineTo(cities[i].x, cityBaseY + 35);
+            ctx.lineTo(cities[i].x + 10, cityBaseY + 25);
+            ctx.lineTo(cities[i].x + 20, cityBaseY + 40);
+            ctx.fill();
+        }
+    }
+    ctx.restore();
+}
+
+function drawMissiles() {
+    // Player missiles
+    ctx.strokeStyle = "#0f0";
+    ctx.lineWidth = 2;
+    for (const m of missiles) {
+        ctx.beginPath();
+        ctx.moveTo(m.x0, m.y0);
+        ctx.lineTo(m.x, m.y);
+        ctx.stroke();
+    }
+    // Enemy missiles
+    ctx.strokeStyle = "#f00";
+    for (const em of enemyMissiles) {
+        // Set line width based on missile speed
+        ctx.lineWidth = em.thickness || 2;
+        ctx.beginPath();
+        ctx.moveTo(em.x0, em.y0);
+        ctx.lineTo(em.x, em.y);
+        ctx.stroke();
+    }
+    // Bombs are drawn separately
+}
+
+function drawBombs() {
+    for (const b of bombs) {
+        // Parachute
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(b.x, b.y + 8, 16, Math.PI, 2 * Math.PI);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(b.x - 16, b.y + 8);
+        ctx.lineTo(b.x - 4, b.y + 20);
+        ctx.moveTo(b.x + 16, b.y + 8);
+        ctx.lineTo(b.x + 4, b.y + 20);
+        ctx.strokeStyle = '#aaa';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Supply crate (instead of bomb)
+        ctx.beginPath();
+        ctx.rect(b.x - 10, b.y + 18, 20, 15);
+        ctx.fillStyle = '#3d3';  // Green for good
+        ctx.fill();
+        ctx.strokeStyle = '#040';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Draw + symbol on crate
+        ctx.beginPath();
+        ctx.moveTo(b.x - 5, b.y + 26);
+        ctx.lineTo(b.x + 5, b.y + 26);
+        ctx.moveTo(b.x, b.y + 21);
+        ctx.lineTo(b.x, b.y + 31);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+    }
+}
+
+function drawExplosions() {
+    for (const e of explosions) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.r, 0, 2 * Math.PI);
+        
+        if (e.isCityExplosion) {
+            // Multiple color layers for city explosions
+            const gradient = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.r);
+            gradient.addColorStop(0, "rgba(255,255,200,0.9)");
+            gradient.addColorStop(0.2, "rgba(255,180,100,0.8)");
+            gradient.addColorStop(0.5, "rgba(255,100,50,0.7)");
+            gradient.addColorStop(0.8, "rgba(200,50,10,0.5)");
+            gradient.addColorStop(1, "rgba(100,10,0,0.2)");
+            ctx.fillStyle = gradient;
+        } else if (e.isSupplyExplosion) {
+            // Green explosion for supply drops
+            const gradient = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.r);
+            gradient.addColorStop(0, "rgba(220,255,220,0.9)");
+            gradient.addColorStop(0.3, "rgba(100,255,100,0.8)");
+            gradient.addColorStop(0.6, "rgba(50,200,50,0.6)");
+            gradient.addColorStop(1, "rgba(20,100,20,0.3)");
+            ctx.fillStyle = gradient;
+        } else {
+            ctx.fillStyle = "rgba(255,255,255,0.4)";
+        }
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
+function drawGameOver() {
+    ctx.save();
+    ctx.font = "48px 'Press Start 2P', monospace";
+    ctx.fillStyle = "#f00";
+    ctx.textAlign = "center";
+    ctx.fillText("GAME OVER", w / 2, h / 2);
+    ctx.font = "32px 'Press Start 2P', monospace";
+    ctx.fillStyle = "#ff0";
+    ctx.fillText("Score: " + score, w / 2, h / 2 + 60);
+    ctx.font = "28px 'Press Start 2P', monospace";
+    ctx.fillStyle = "#0ff";
+    ctx.fillText(`Level: ${level}`, w / 2, h / 2 + 110);
+    ctx.restore();
+}
+
+// Missile logic
+function spawnEnemyMissile() {
+    let aliveCities = cities.filter(c => c.alive);
+    if (aliveCities.length === 0) return;
+    if (missilesLaunched >= missilesThisLevel) return;
+    let target = aliveCities[Math.floor(Math.random() * aliveCities.length)];
+    let x0 = Math.random() * w;
+    let y0 = 0;
+    let x1 = target.x;
+    let y1 = h - 70;
+    
+    // Much more varied missile speeds
+    let speedVariation = Math.random();
+    let speed;
+    
+    // Apply speed multiplier for mobile devices
+    const mobileSpeedMultiplier = isMobile ? 2.0 : 1.0;
+    
+    if (speedVariation < 0.2) {
+        // 20% chance of a very slow missile
+        speed = missileBaseSpeed * 0.6 * mobileSpeedMultiplier + (level - 1) * 0.05;
+    } else if (speedVariation < 0.6) {
+        // 40% chance of normal missile
+        speed = missileBaseSpeed * mobileSpeedMultiplier + (level - 1) * 0.06 + Math.random() * 0.3;
+    } else if (speedVariation < 0.9) {
+        // 30% chance of fast missile
+        speed = missileBaseSpeed * 1.5 * mobileSpeedMultiplier + (level - 1) * 0.07 + Math.random() * 0.2;
+    } else {
+        // 10% chance of very fast missile
+        speed = missileBaseSpeed * 2.3 * mobileSpeedMultiplier + (level - 1) * 0.08;
+    }
+    
+    // Add a visual indicator for the missile speed (thicker line for faster missiles)
+    let thickness = 1;
+    if (isMobile) {
+        // Thicker lines on mobile for better visibility
+        if (speed > missileBaseSpeed * 3) thickness = 5;
+        else if (speed > missileBaseSpeed * 2) thickness = 4;
+        else if (speed > missileBaseSpeed) thickness = 3;
+        else thickness = 2;
+    } else {
+        if (speed > missileBaseSpeed * 2) thickness = 4;
+        else if (speed > missileBaseSpeed * 1.4) thickness = 3;
+        else if (speed > missileBaseSpeed) thickness = 2;
+    }
+    
+    enemyMissiles.push({ x0, y0, x: x0, y: y0, x1, y1, speed, thickness });
+    missilesLaunched++;
+}
+
+function spawnPlayerMissile(targetX, targetY) {
+    // Find closest alive launcher with ammo
+    let minDist = Infinity, idx = -1;
+    for (let i = 0; i < cities.length; i++) {
+        if (cities[i].alive && cities[i].missiles > 0) {
+            let d = Math.abs(cities[i].x - targetX);
+            if (d < minDist) {
+                minDist = d;
+                idx = i;
+            }
+        }
+    }
+    if (idx === -1) return; // No city with ammo
+    let x0 = cities[idx].x;
+    let y0 = h - 75;
+    let speed = 5;
+    missiles.push({ x0, y0, x: x0, y: y0, x1: targetX, y1: targetY, speed });
+    cities[idx].missiles--;
+    playLaunchSound();
+}
+
+function spawnBomb() {
+    // Only spawn one supply drop per level
+    if (supplyDropThisLevel) return;
+    
+    let aliveCities = cities.filter(c => c.alive);
+    if (aliveCities.length === 0) return;
+    
+    // Position it randomly over the screen, not targeting a specific city
+    let x = 100 + Math.random() * (w - 200);
+    let y = 0;
+    let speed = 0.6 + Math.random() * 0.3; // Slow fall
+    bombs.push({ x, y, speed, landed: false, isSupplyDrop: true });
+    supplyDropThisLevel = true; // Mark that a supply drop has happened this level
+}
+
+function updateMissiles() {
+    // Player missiles
+    for (let i = missiles.length - 1; i >= 0; i--) {
+        let m = missiles[i];
+        let dx = m.x1 - m.x, dy = m.y1 - m.y;
+        let dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < m.speed) {
+            // Explode
+            explosions.push({ x: m.x1, y: m.y1, r: 1, maxR: 50, frame: 0 });
+            playExplosionSound();
+            missiles.splice(i, 1);
+            continue;
+        }
+        m.x += m.speed * dx / dist;
+        m.y += m.speed * dy / dist;
+    }
+    // Enemy missiles
+    for (let i = enemyMissiles.length - 1; i >= 0; i--) {
+        let em = enemyMissiles[i];
+        let dx = em.x1 - em.x, dy = em.y1 - em.y;
+        let dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < em.speed) {
+            // Hit!
+            for (let city of cities) {
+                if (city.alive && Math.abs(city.x - em.x1) < 28) {
+                    city.alive = false;
+                    playCityExplosionSound();
+                    // Create huge city explosion
+                    explosions.push({ x: city.x, y: h - 70, r: 1, maxR: 120, frame: 0, isCityExplosion: true });
+                    // Screen flash
+                    flashScreen();
+                    break;
+                }
+            }
+            enemyMissiles.splice(i, 1);
+            continue;
+        }
+        // Check for explosion collision
+        for (let e of explosions) {
+            let d = Math.sqrt((em.x - e.x) ** 2 + (em.y - e.y) ** 2);
+            if (d < e.r) {
+                score += 100;
+                playExplosionSound();
+                enemyMissiles.splice(i, 1);
+                break;
+            }
+        }
+        em.x += em.speed * dx / dist;
+        em.y += em.speed * dy / dist;
+    }
+    // Bombs
+    for (let i = bombs.length - 1; i >= 0; i--) {
+        let b = bombs[i];
+        if (b.landed) continue;
+        b.y += b.speed;
+        // Check for explosion collision
+        let exploded = false;
+        for (let e of explosions) {
+            let d = Math.sqrt((b.x - e.x) ** 2 + (b.y + 24 - e.y) ** 2);
+            if (d < e.r) {
+                score += 200;
+                playExplosionSound();
+                bombs.splice(i, 1);
+                exploded = true;
+                break;
+            }
+        }
+        if (exploded) continue;
+        // Check if supply drop lands near ground
+        if (b.y >= h - 100) {
+            // Add 5 missiles to each surviving city
+            let missilesAdded = false;
+            for (let city of cities) {
+                if (city.alive) {
+                    city.missiles += 5;
+                    missilesAdded = true;
+                }
+            }
+            
+            if (missilesAdded) {
+                // Create a positive visual/audio feedback
+                score += 300;
+                
+                // Create a green explosion effect
+                const centerX = b.x;
+                const centerY = b.y + 24;
+                explosions.push({ 
+                    x: centerX, 
+                    y: centerY, 
+                    r: 1, 
+                    maxR: 60, 
+                    frame: 0, 
+                    isSupplyExplosion: true 
+                });
+                
+                // Play a positive sound
+                playLaunchSound();
+            }
+            bombs.splice(i, 1);
+        }
+        // Remove if off screen
+        if (b.y > h + 40) bombs.splice(i, 1);
+    }
+}
+
+function updateExplosions() {
+    for (let i = explosions.length - 1; i >= 0; i--) {
+        let e = explosions[i];
+        e.frame++;
+        if (e.isCityExplosion) {
+            // Larger, faster city explosions
+            if (e.frame < 10) {
+                e.r += 12;
+            } else if (e.frame < 20) {
+                e.r += 6;
+            } else {
+                e.r -= 8;
+                if (e.r < 0) {
+                    explosions.splice(i, 1);
+                }
+            }
+        } else if (e.isSupplyExplosion) {
+            // Supply drop explosion (bouncy effect)
+            if (e.frame < 8) {
+                e.r += 7;
+            } else if (e.frame < 15) {
+                e.r += 3;
+            } else if (e.frame < 25) {
+                e.r -= 1;
+            } else if (e.frame < 35) {
+                e.r += 2;
+            } else {
+                e.r -= 3;
+                if (e.r < 0) {
+                    explosions.splice(i, 1);
+                }
+            }
+        } else {
+            // Regular explosions
+            if (e.frame < 10) {
+                e.r += 5;
+            } else if (e.frame < 20) {
+                e.r += 2;
+            } else {
+                e.r -= 4;
+                if (e.r < 0) {
+                    explosions.splice(i, 1);
+                }
+            }
+        }
+    }
+}
+
+function startLevel(lv) {
+    level = lv;
+    if (level === 1) missilesThisLevel = 20;
+    else if (level === 2) missilesThisLevel = 35;
+    else if (level === 3) missilesThisLevel = 50;
+    else missilesThisLevel = 50 + (level - 3) * 15;
+    missilesLaunched = 0;
+    supplyDropThisLevel = false; // Reset supply drop flag for the new level
+}
+
+function randomCloudShape(cx, cy, scale) {
+    // Generate a more irregular, fluffy cloud shape
+    let points = [];
+    // More points for fluffier edges
+    let n = 12 + Math.floor(Math.random() * 8); // 12-19 points for more detail
+    // Reduce base radius to make clouds smaller overall
+    let baseR = 22 * scale + Math.random() * 14 * scale;
+    
+    // Create the cloud outline with more variation
+    for (let i = 0; i < n; i++) {
+        let angle = (i / n) * 2 * Math.PI;
+        // More random variation in radius for fluffier appearance
+        let variation = Math.random() * 15 * scale * (Math.random() < 0.5 ? 1 : -1);
+        let r = baseR + variation;
+        // Add some wobble to the x,y to make it less uniform
+        let wobble = Math.random() * 0.2;
+        let x = cx + Math.cos(angle + wobble) * r;
+        let y = cy + Math.sin(angle - wobble) * (r * (0.4 + Math.random() * 0.4));
+        points.push({x, y});
+    }
+    
+    // Add more small circles for extra fluffiness
+    let fluff = [];
+    let fluffCount = 5 + Math.floor(Math.random() * 4); // More fluff circles (5-8)
+    for (let i = 0; i < fluffCount; i++) {
+        // Position fluff slightly more towards the edges
+        let angle = Math.random() * Math.PI * 2;
+        let dist = (Math.random() * 0.7 + 0.3) * baseR;
+        let fx = cx + Math.cos(angle) * dist;
+        let fy = cy + Math.sin(angle) * dist * 0.6;
+        // Smaller fluff circles for a more delicate look
+        let fr = (4 + Math.random() * 8) * scale;
+        fluff.push({fx, fy, fr});
+    }
+    
+    return {points, fluff};
+}
+
+function spawnCloud() {
+    let y = 40 + Math.random() * 180;
+    // Smaller scale range for smaller clouds
+    let scale = 0.5 + Math.random() * 0.9;
+    let speed = 0.07 + Math.random() * 0.13;
+    let x = Math.random() < 0.5 ? -120 : w + 120;
+    let dir = x < 0 ? 1 : -1;
+    let shape = randomCloudShape(0, 0, scale);
+    // Higher alpha for more distinct clouds
+    let alpha = 0.55 + Math.random() * 0.35;
+    return { x, y, speed, dir, shape, scale, alpha };
+}
+
+for (let i = 0; i < NUM_CLOUDS; i++) {
+    clouds.push(spawnCloud());
+}
+
+function updateClouds() {
+    for (let c of clouds) {
+        c.x += c.speed * c.dir;
+    }
+    // Respawn clouds that go off screen
+    for (let i = 0; i < clouds.length; i++) {
+        if ((clouds[i].dir === 1 && clouds[i].x > w + 100) || (clouds[i].dir === -1 && clouds[i].x < -100)) {
+            clouds[i] = spawnCloud();
+            clouds[i].dir = Math.random() < 0.5 ? 1 : -1;
+            clouds[i].x = clouds[i].dir === 1 ? -80 : w + 80;
+        }
+    }
+}
+
+function drawClouds() {
+    ctx.save();
+    for (let c of clouds) {
+        ctx.globalAlpha = c.alpha;
+        // Main cloud shape
+        ctx.beginPath();
+        let first = true;
+        for (let pt of c.shape.points) {
+            let px = c.x + pt.x;
+            let py = c.y + pt.y;
+            if (first) {
+                ctx.moveTo(px, py);
+                first = false;
+            } else {
+                ctx.lineTo(px, py);
+            }
+        }
+        ctx.closePath();
+        ctx.fillStyle = '#fff';
+        ctx.shadowColor = '#ddeeff';
+        ctx.shadowBlur = 18;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        // Fluff balls
+        for (let f of c.shape.fluff) {
+            ctx.beginPath();
+            ctx.arc(c.x + f.fx, c.y + f.fy, f.fr, 0, 2 * Math.PI);
+            ctx.fillStyle = '#f8f8ff';
+            ctx.globalAlpha = c.alpha * 0.7;
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1.0;
+    }
+    ctx.restore();
+}
+
+// Mushroom cloud effect
+let mushroomCloud = null;
+function startMushroomCloud() {
+    mushroomCloud = {
+        y: h,
+        progress: 0,
+        maxProgress: 120,
+        baseR: 60,
+        stemW: 38,
+        stemH: 0
+    };
+    if (sndMushroom) {
+        sndMushroom.currentTime = 0;
+        sndMushroom.play();
+    }
+}
+
+function updateMushroomCloud() {
+    if (!mushroomCloud) return;
+    if (mushroomCloud.progress < mushroomCloud.maxProgress) {
+        mushroomCloud.progress++;
+        mushroomCloud.y = h - (h * (mushroomCloud.progress / mushroomCloud.maxProgress));
+        mushroomCloud.stemH = Math.min(h * 0.5, mushroomCloud.stemH + 6);
+    }
+}
+
+function drawMushroomCloud() {
+    if (!mushroomCloud) return;
+    ctx.save();
+    let centerX = w / 2;
+    let baseY = mushroomCloud.y + mushroomCloud.stemH;
+    // Stem
+    ctx.beginPath();
+    ctx.ellipse(centerX, baseY - mushroomCloud.stemH / 2, mushroomCloud.stemW, mushroomCloud.stemH / 2, 0, 0, 2 * Math.PI);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.shadowColor = '#fff';
+    ctx.shadowBlur = 24;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // Cap
+    ctx.beginPath();
+    ctx.ellipse(centerX, mushroomCloud.y, mushroomCloud.baseR * 2.2, 70, 0, Math.PI * 1.1, Math.PI * 1.9, false);
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.shadowColor = '#fff';
+    ctx.shadowBlur = 32;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // Cap shading
+    ctx.beginPath();
+    ctx.ellipse(centerX, mushroomCloud.y + 10, mushroomCloud.baseR * 1.7, 32, 0, 0, 2 * Math.PI);
+    ctx.fillStyle = 'rgba(220,220,220,0.5)';
+    ctx.fill();
+    // Fluffy edges
+    for (let i = 0; i < 7; i++) {
+        let angle = Math.PI * (0.7 + 0.6 * (i / 6));
+        let rx = Math.cos(angle) * mushroomCloud.baseR * 2.2;
+        let ry = Math.sin(angle) * 70;
+        ctx.beginPath();
+        ctx.arc(centerX + rx, mushroomCloud.y + ry, 18 + Math.random() * 10, 0, 2 * Math.PI);
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.fill();
+    }
+    ctx.restore();
+}
+
+// Screen flash effect
+let screenFlash = {
+    active: false,
+    opacity: 0,
+    duration: 5
+};
+
+function flashScreen() {
+    screenFlash.active = true;
+    screenFlash.opacity = 0.7;
+}
+
+function updateScreenFlash() {
+    if (screenFlash.active) {
+        screenFlash.opacity -= 0.7 / screenFlash.duration;
+        if (screenFlash.opacity <= 0) {
+            screenFlash.active = false;
+            screenFlash.opacity = 0;
+        }
+    }
+}
+
+function drawScreenFlash() {
+    if (screenFlash.active) {
+        ctx.save();
+        ctx.fillStyle = `rgba(255, 255, 255, ${screenFlash.opacity})`;
+        ctx.fillRect(0, 0, w, h);
+        ctx.restore();
+    }
+}
+
+// Main loop
+function gameLoop() {
+    ctx.clearRect(0, 0, w, h);
+    
+    // Draw background image
+    if (bgImage.complete) {
+        ctx.drawImage(bgImage, 0, 0, w, h);
+    } else {
+        // Fallback if image not loaded
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, w, h);
+        // Make sure it loads for next frame
+        bgImage.onload = () => requestAnimationFrame(gameLoop);
+    }
+    
+    document.getElementById("score").innerHTML = `Score: ${score} | Level: ${level}`;
+    drawCityBackground();
+    drawTitle();
+    drawCities();
+    drawMissiles();
+    drawBombs();
+    drawExplosions();
+    if (gameOver) {
+        drawGameOver();
+        updateMushroomCloud();
+        drawMushroomCloud();
+        // Draw clouds on top at the end
+        updateClouds();
+        drawClouds();
+        return;
+    }
+    updateMissiles();
+    updateExplosions();
+    updateScreenFlash();
+    drawScreenFlash();
+
+    // Lose check
+    if (!cities.some(c => c.alive)) {
+        if (!gameOver) {
+            playLoseSound();
+            startMushroomCloud();
+        }
+        gameOver = true;
+    }
+
+    // Level up check: all missiles for this level launched and none left on screen
+    if (!gameOver && !levelingUp && missilesLaunched >= missilesThisLevel && enemyMissiles.length === 0) {
+        levelingUp = true;
+        setTimeout(() => {
+            startLevel(level + 1);
+            levelingUp = false;
+        }, 1200);
+    }
+
+    // Draw clouds last so they appear on top of everything
+    updateClouds();
+    drawClouds();
+
+    requestAnimationFrame(gameLoop);
+}
+
+// Missile spawn interval
+let missileInterval = setInterval(() => {
+    if (!gameOver) spawnEnemyMissile();
+}, 1600); // slower spawn
+
+// Bomb spawn interval
+let lastBombTime = 0;
+const bombCooldown = 25000; // 25 seconds
+
+function trySpawnBomb() {
+    const now = Date.now();
+    if (!gameOver && now - lastBombTime > bombCooldown) {
+        spawnBomb();
+        lastBombTime = now;
+    }
+}
+
+setInterval(trySpawnBomb, 1000);
+
+canvas.addEventListener('click', function(e) {
+    if (gameOver) return;
+    let rect = canvas.getBoundingClientRect();
+    let x = e.clientX - rect.left;
+    let y = e.clientY - rect.top;
+    if (y < h - 120) spawnPlayerMissile(x, y);
+});
+
+canvas.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    if (!gameOver) return;
+    // Reset game
+    initCities();
+    missiles = [];
+    enemyMissiles = [];
+    bombs = [];
+    explosions = [];
+    score = 0;
+    gameOver = false;
+    lastBombTime = 0;
+    levelingUp = false;
+    mushroomCloud = null;
+    startLevel(1);
+    gameLoop();
+});
+
+// Initialize the game
+resizeCanvas();
+initCities();
+startLevel(1);
+gameLoop();
+</script>
+</body>
+</html>
