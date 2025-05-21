@@ -1,0 +1,1439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Migrantopoly - Path to Security</title>
+    <style>
+        body {
+            font-family: 'Inter', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f7f0; /* Light green-ish background */
+            padding: 20px;
+            color: #333; /* Default dark text */
+        }
+
+        h1 {
+            color: #2e7d32; /* Darker green for title */
+            margin-bottom: 25px;
+            font-size: 2.2em; /* Adjusted from 2.5em */
+            text-align: center;
+        }
+
+        #game-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 25px;
+        }
+
+        #board-container {
+            display: grid;
+            grid-template-columns: 100px repeat(6, 70px) 100px;
+            grid-template-rows: 100px repeat(6, 70px) 100px;
+            border: 3px solid #4a5568;
+            width: 620px;
+            height: 620px;
+            position: relative;
+            background-color: #e2f0e2; /* Light board background */
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .space {
+            border: 1px solid #a0aec0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 10px; /* Reverted base font size */
+            position: relative;
+            padding: 3px;
+            box-sizing: border-box;
+            background-color: #fff; /* White space background */
+            color: #333; /* Dark text for spaces */
+            border-radius: 5px;
+        }
+        .space .name {
+            font-weight: bold;
+            font-size: 10px; /* Reverted font size */
+            margin-bottom: 2px;
+            line-height: 1.2;
+        }
+        .space .price {
+            font-size: 9px; /* Reverted font size */
+            color: #1a202c; /* Darker price text */
+            font-weight: normal; /* Reverted: prices not bold by default */
+        }
+        .space .owner-indicator {
+            width: 90%;
+            height: 6px;
+            margin-top: 3px;
+            background-color: transparent;
+            border-radius: 3px;
+            position: absolute;
+            bottom: 3px;
+            left: 5%;
+        }
+         .space .development-indicator {
+            font-size: 8px;
+            color: #555;
+            position: absolute;
+            top: 15px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .corner {
+            font-weight: bold;
+            font-size: 13px; /* Default corner font size */
+            background-color: #c8e6c9; /* Light green for corners */
+        }
+        /* Removed specific .corner .name styling for large red font */
+
+        .property .color-bar {
+            width: 100%;
+            height: 12px;
+            border-bottom: 1px solid #ccc;
+            position: absolute;
+            top: 0;
+            left: 0;
+            border-top-left-radius: 4px;
+            border-top-right-radius: 4px;
+        }
+        .space .name { margin-top: 14px; }
+        .corner .name, .welfare .name, .opportunity .name, .tax .name, .payout .name, .neutral .name {
+            margin-top: 0;
+        }
+
+
+        .brown .color-bar { background-color: #8B4513; }
+        .light-blue .color-bar { background-color: #ADD8E6; }
+        .pink .color-bar { background-color: #FFC0CB; }
+        .orange .color-bar { background-color: #FFA500; }
+        .red .color-bar { background-color: #FF0000; }
+        .green .color-bar { background-color: #008000; }
+
+
+        .player-token {
+            width: 16px; height: 16px; border-radius: 50%;
+            position: absolute;
+            border: 2px solid white; /* White border for light theme */
+            font-size: 8px; line-height: 12px; text-align: center; color: white; /* For P1, P2 text */
+            box-shadow: 0 0 3px rgba(0,0,0,0.5);
+            z-index: 10;
+            transition: all 0.5s ease-in-out;
+        }
+        #player0-token { background-color: #e53e3e; } /* Red for P1 */
+        #player1-token { background-color: #3182ce; } /* Blue for P2 */
+        #player2-token { background-color: #38a169; } /* Green for P3 */
+        #player3-token { background-color: #805ad5; } /* Purple for P4 */
+
+
+        #game-info-area {
+            width: 320px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        #player-info, #controls, #card-display-container, #game-status-message-container, #develop-property-container, #llm-response-modal {
+            padding: 15px;
+            background-color: white; /* White panel background */
+            border: 1px solid #cbd5e0; /* Softer border */
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            color: #333; /* Dark text for panels */
+        }
+        #player-info div { margin-bottom: 8px; font-size: 14px; }
+        #dice-roll, #card-message { margin-bottom: 10px; font-size: 14px; }
+        button {
+            padding: 10px 15px;
+            font-size: 14px;
+            cursor: pointer;
+            background-color: #48bb78; /* Green buttons */
+            color: white;
+            border: none;
+            border-radius: 6px;
+            transition: background-color 0.2s;
+            margin-top: 5px;
+            margin-right: 5px;
+        }
+        button:last-child { margin-right: 0; }
+        button:hover {
+            background-color: #38a169; /* Darker green on hover */
+        }
+        button:disabled {
+            background-color: #a0aec0;
+            color: #e2e8f0;
+            cursor: not-allowed;
+        }
+        #end-turn-button { background-color: #f56565; } /* Red for end turn */
+        #end-turn-button:hover { background-color: #c53030; }
+        #develop-property-button, .gemini-button { background-color: #4299e1; } /* Blue for develop and Gemini */
+        #develop-property-button:hover, .gemini-button:hover { background-color: #2b6cb0; }
+
+
+        #card-display-container, #develop-property-container, #llm-response-modal {
+            display: none;
+        }
+        #card-display-container h3, #develop-property-container h3, #llm-response-modal h3 {
+             margin-top: 0; color: #2c7a7b; /* Teal title for modals */
+        }
+        #llm-response-modal {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            max-width: 500px;
+            z-index: 1000;
+            padding: 20px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        #llm-response-content {
+            margin-bottom: 15px;
+            white-space: pre-wrap;
+        }
+
+
+        #detention-actions button {
+            background-color: #ed8936; /* Orange for detention actions */
+            margin-right: 5px;
+        }
+        #detention-actions button:hover {
+            background-color: #dd6b20;
+        }
+        #game-status-message {
+            font-weight: bold;
+            color: #c53030;
+            min-height: 20px;
+        }
+        #pre-game-roll-area button {
+            background-color: #ecc94b;
+            color: #333;
+        }
+        #pre-game-roll-area button:hover {
+            background-color: #d69e2e;
+        }
+        #pre-game-roll-results { margin-top: 10px; font-size: 13px; }
+        #develop-property-options button {
+            display: block;
+            width: calc(100% - 10px);
+            margin-bottom: 8px;
+            background-color: #4299e1; /* Match develop button */
+        }
+        #develop-property-options button:hover {
+            background-color: #2b6cb0;
+        }
+        .council-insight-area {
+            font-size: 0.9em;
+            margin-top: 5px;
+            padding: 8px;
+            background-color: #e2f0e2; /* Light background for insight area */
+            border-radius: 4px;
+            border: 1px dashed #a0aec0;
+            color: #333; /* Dark text for insight */
+        }
+
+    </style>
+</head>
+<body>
+    <h1>Migrantopoly - Path to Security</h1>
+
+    <div id="game-container">
+        <div id="board-container">
+            </div>
+
+        <div id="game-info-area">
+            <div id="player-info">
+                </div>
+
+            <div id="controls">
+                <h3 id="current-turn-display">Current Turn: Player 1</h3>
+                <div id="pre-game-roll-area" style="display:none;">
+                    <h4>Determine Starting Player</h4>
+                    <button id="pre-game-roll-button">Roll to Start</button>
+                    <div id="pre-game-roll-results"></div>
+                </div>
+                <button id="roll-dice-button" style="display:none;">Roll Dice</button>
+                <div id="dice-roll">Dice: <span>-</span></div>
+                <button id="view-property-story-button" class="gemini-button" style="display:none;">View Property Story ✨</button>
+                <button id="develop-property-button" style="display:none;">Develop Property</button>
+                <button id="end-turn-button" style="display:none;">End Turn</button>
+                <button id="buy-property-button" style="display:none;">Buy Property (£<span id="buy-property-price"></span>)</button>
+                <div id="detention-actions" style="margin-top: 10px;">
+                    </div>
+            </div>
+
+            <div id="develop-property-container">
+                <h3 id="develop-property-name">Develop Property</h3>
+                <div id="develop-property-options">
+                    </div>
+                <button id="close-develop-button">Close</button>
+            </div>
+
+
+            <div id="card-display-container">
+                <h3 id="card-type-title">Card Drawn</h3>
+                <p id="card-message"></p>
+                <button id="card-ok-button">OK</button>
+            </div>
+
+            <div id="game-status-message-container">
+                <h4>Game Status:</h4>
+                <p id="game-status-message">Game in progress...</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="llm-response-modal">
+        <h3 id="llm-response-title">Property Story</h3>
+        <div id="llm-response-content">Loading story...</div>
+        <button id="llm-modal-ok-button">OK</button>
+    </div>
+
+
+    <script>
+        // --- Game Data ---
+        let boardLayout = [
+            { id: 0, name: "Go", type: "go" },
+            { id: 1, name: "Tent in Field 1", type: "property", price: 60, rent: [4, 10, 20, 40, 80], color: "brown", groupId: "brown" },
+            { id: 2, name: "Welfare Card", type: "welfare" },
+            { id: 3, name: "Tent in Field 2", type: "property", price: 80, rent: [8, 10, 20, 40, 80], color: "brown", groupId: "brown" },
+            { id: 4, name: "Tax Space", type: "tax", amount: 75 },
+            { id: 5, name: "Tesco Cardboard Skip 1", type: "property", price: 100, rent: [6, 15, 30, 60, 120], color: "light-blue", groupId: "lightblue" },
+            { id: 6, name: "Tesco Cardboard Skip 2", type: "property", price: 120, rent: [8, 15, 30, 60, 120], color: "light-blue", groupId: "lightblue" },
+
+            { id: 7, name: "Detention Center", type: "detention_visiting" },
+            { id: 8, name: "Payout: Job Seeker's", type: "payout", amount: 100 },
+            { id: 9, name: "Tesco Cardboard Skip 3", type: "property", price: 140, rent: [10, 15, 30, 60, 120], color: "light-blue", groupId: "lightblue" },
+            { id: 10, name: "Council Highrise 1", type: "property", price: 160, rent: [12, 25, 50, 100, 200], color: "pink", groupId: "pink" },
+            { id: 11, name: "Welfare Card", type: "welfare" },
+            { id: 12, name: "Council Highrise 2", type: "property", price: 180, rent: [14, 25, 50, 100, 200], color: "pink", groupId: "pink" },
+            { id: 13, name: "Council Highrise 3", type: "property", price: 200, rent: [16, 25, 50, 100, 200], color: "pink", groupId: "pink" },
+
+            { id: 14, name: "Neutral Park", type: "neutral" },
+            { id: 15, name: "Gypsy Estate 1", type: "property", price: 220, rent: [18, 35, 70, 140, 280], color: "orange", groupId: "orange" },
+            { id: 16, name: "Opportunity Card", type: "opportunity" },
+            { id: 17, name: "Gypsy Estate 2", type: "property", price: 240, rent: [20, 35, 70, 140, 280], color: "orange", groupId: "orange" },
+            { id: 18, name: "Payout: Emergency Relief", type: "payout", amount: 100 },
+            { id: 19, name: "Gypsy Estate 3", type: "property", price: 260, rent: [22, 35, 70, 140, 280], color: "orange", groupId: "orange" },
+            { id: 20, name: "Holiday Inn 1", type: "property", price: 280, rent: [24, 45, 90, 180, 360], color: "red", groupId: "red" },
+
+            { id: 21, name: "Go to Deportation", type: "go_to_detention" },
+            { id: 22, name: "Welfare Card", type: "welfare" },
+            { id: 23, name: "Holiday Inn 2", type: "property", price: 300, rent: [26, 45, 90, 180, 360], color: "red", groupId: "red" },
+            { id: 24, name: "Holiday Inn 3", type: "property", price: 320, rent: [28, 45, 90, 180, 360], color: "red", groupId: "red" },
+            { id: 25, name: "Luxury Flat 1", type: "property", price: 350, rent: [30, 60, 120, 240, 480], color: "green", groupId: "green" },
+            { id: 26, name: "Opportunity Card", type: "opportunity" },
+            { id: 27, name: "Luxury Flat 2", type: "property", price: 400, rent: [35, 60, 120, 240, 480], color: "green", groupId: "green" },
+        ];
+
+        const detentionCenterSpaceId = boardLayout.find(s => s.name === "Detention Center").id;
+        const TENANCY_COST = 50;
+        const PR_COST = 150;
+        const MAX_TENANCIES = 3;
+
+
+        const welfareCards = [
+            { text: "Child Benefit: Collect £100.", action: "collect", amount: 100 },
+            { text: "Free Health Service: Gain a health service (worth £100).", action: "gainHealthService" },
+            { text: "Council House Grant: Collect £150.", action: "collect", amount: 150 },
+            { text: "Social Worker Fee: Pay £50.", action: "pay", amount: 50 },
+            { text: "Food Voucher: Collect £75.", action: "collect", amount: 75 },
+            { text: "Education Grant: Collect £120.", action: "collect", amount: 120 },
+            { text: "Housing Inspection: Pay £20 per tenancy owned.", action: "payPerTenancy", amountPer: 20 },
+            { text: "Utility Subsidy: Collect £80.", action: "collect", amount: 80 },
+            { text: "Legal Aid: Get out of Detention Center free.", action: "getOutOfDetentionFree" },
+            { text: "Emergency Relief: Collect £100.", action: "collect", amount: 100 },
+            { text: "Tax Audit: Pay £60.", action: "pay", amount: 60 },
+            { text: "Welfare Review: Move to nearest Payout Space.", action: "moveToNearestPayout" }
+        ];
+
+        const opportunityCards = [
+            { text: "Work Permit Granted: Collect £150.", action: "collect", amount: 150 },
+            { text: "Language Subsidy: Collect £50.", action: "collect", amount: 50 },
+            { text: "Community Grant: Collect £100.", action: "collect", amount: 100 },
+            { text: "Deportation Threat: Go to Detention Center.", action: "goToDetentionDirect" },
+            { text: "Legal Aid: Get out of Detention Center free.", action: "getOutOfDetentionFree" },
+            { text: "Job Offer: Collect £120.", action: "collect", amount: 120 },
+            { text: "Housing Voucher: Next estate purchase is 25% off.", action: "housingVoucher" },
+            { text: "Free Health Service: Gain a health service (worth £100).", action: "gainHealthService" },
+            { text: "Bureaucratic Delay: Pay £50 to the bank.", action: "pay", amount: 50 },
+            { text: "Tax Refund: Collect £75.", action: "collect", amount: 75 },
+            { text: "Volunteer Bonus: Collect £40 from each player.", action: "collectFromPlayers", amount: 40 },
+            { text: "Advance to Go: Collect £200.", action: "advanceToGo" }
+        ];
+
+        let players = [];
+        let currentPlayerIndex = 0;
+        let numPlayers = 3; // Default to min 3 as per rules
+        let bank = { money: 15000 };
+        let propertyData;
+
+        let shuffledWelfareCards = [];
+        let shuffledOpportunityCards = [];
+        let gameActive = true;
+        let preGameRolls = [];
+        let preGamePlayerIndex = 0;
+
+
+        // --- DOM Elements ---
+        const boardContainer = document.getElementById('board-container');
+        const playerInfoDiv = document.getElementById('player-info');
+        const rollDiceButton = document.getElementById('roll-dice-button');
+        const endTurnButton = document.getElementById('end-turn-button');
+        const buyPropertyButton = document.getElementById('buy-property-button');
+        const buyPropertyPriceSpan = document.getElementById('buy-property-price');
+        const developPropertyButton = document.getElementById('develop-property-button');
+        const diceRollDiv = document.getElementById('dice-roll').querySelector('span');
+        const currentTurnDisplay = document.getElementById('current-turn-display');
+        const cardDisplayContainer = document.getElementById('card-display-container');
+        const cardTypeTitle = document.getElementById('card-type-title');
+        const cardMessageP = document.getElementById('card-message');
+        const cardOkButton = document.getElementById('card-ok-button');
+        const detentionActionsDiv = document.getElementById('detention-actions');
+        const gameStatusMessageP = document.getElementById('game-status-message');
+        const preGameRollArea = document.getElementById('pre-game-roll-area');
+        const preGameRollButton = document.getElementById('pre-game-roll-button');
+        const preGameRollResultsDiv = document.getElementById('pre-game-roll-results');
+        const developPropertyContainer = document.getElementById('develop-property-container');
+        const developPropertyNameH3 = document.getElementById('develop-property-name');
+        const developPropertyOptionsDiv = document.getElementById('develop-property-options');
+        const closeDevelopButton = document.getElementById('close-develop-button');
+        const viewPropertyStoryButton = document.getElementById('view-property-story-button');
+        const llmResponseModal = document.getElementById('llm-response-modal');
+        const llmResponseTitle = document.getElementById('llm-response-title');
+        const llmResponseContent = document.getElementById('llm-response-content');
+        const llmModalOkButton = document.getElementById('llm-modal-ok-button');
+
+
+        // --- Game Logic Functions ---
+        function shuffleDeck(deck) {
+            return deck.sort(() => Math.random() - 0.5);
+        }
+
+        function setupBoard() {
+            boardContainer.innerHTML = '';
+            boardLayout.forEach((s, i) => {
+                const spaceDiv = document.createElement('div');
+                spaceDiv.id = `space-${s.id}`;
+                spaceDiv.classList.add('space');
+                if (s.type === 'go' || s.type === 'detention_visiting' || s.type === 'neutral' || s.type === 'go_to_detention') {
+                    spaceDiv.classList.add('corner');
+                }
+                if (s.type === 'property') {
+                    spaceDiv.classList.add('property', s.color || s.groupId);
+                    const colorBar = document.createElement('div');
+                    colorBar.classList.add('color-bar');
+                    spaceDiv.appendChild(colorBar);
+                }
+
+                const nameDiv = document.createElement('div');
+                nameDiv.classList.add('name');
+                nameDiv.textContent = s.name;
+                spaceDiv.appendChild(nameDiv);
+
+                if (s.type === 'property') {
+                    const devIndicator = document.createElement('div');
+                    devIndicator.classList.add('development-indicator');
+                    devIndicator.id = `dev-indicator-${s.id}`;
+                    spaceDiv.appendChild(devIndicator);
+                }
+
+
+                if (s.price) {
+                    const priceDiv = document.createElement('div');
+                    priceDiv.classList.add('price');
+                    priceDiv.textContent = `£${s.price}`;
+                    spaceDiv.appendChild(priceDiv);
+                }
+                if (s.type === 'property') {
+                    const ownerIndicator = document.createElement('div');
+                    ownerIndicator.classList.add('owner-indicator');
+                    ownerIndicator.id = `owner-indicator-${s.id}`;
+                    spaceDiv.appendChild(ownerIndicator);
+                }
+
+                if (i === 0) { spaceDiv.style.gridArea = `1 / 1`; }
+                else if (i >= 1 && i <= 6) { spaceDiv.style.gridArea = `1 / ${i + 1}`; }
+                else if (i === 7) { spaceDiv.style.gridArea = `1 / 8`; }
+                else if (i >= 8 && i <= 13) { spaceDiv.style.gridArea = `${(i - 7) + 1} / 8`; }
+                else if (i === 14) { spaceDiv.style.gridArea = `8 / 8`; }
+                else if (i >= 15 && i <= 20) { spaceDiv.style.gridArea = `8 / ${8 - (i - 14)}`; }
+                else if (i === 21) { spaceDiv.style.gridArea = `8 / 1`; }
+                else if (i >= 22 && i <= 27) { spaceDiv.style.gridArea = `${8 - (i - 21)} / 1`; }
+
+                boardContainer.appendChild(spaceDiv);
+            });
+
+            for (let j = 0; j < numPlayers; j++) {
+                const token = document.createElement('div');
+                token.id = `player${j}-token`;
+                token.classList.add('player-token');
+                token.textContent = `P${j+1}`;
+                document.getElementById('space-0').appendChild(token);
+            }
+            updateAllDevelopmentIndicators();
+        }
+
+
+        function initializeGame() {
+            gameActive = true;
+            const numPlayersInput = prompt("Enter number of players (3-4):", "3"); // Player count updated
+            numPlayers = parseInt(numPlayersInput) || 3;
+            if (numPlayers < 3) numPlayers = 3; // Min 3 players
+            if (numPlayers > 4) numPlayers = 4; // Max 4 players
+
+            players = [];
+            for (let i = 0; i < numPlayers; i++) {
+                players.push({
+                    id: i,
+                    name: `Player ${i + 1}`,
+                    money: 1200, position: 0, properties: [], healthServices: 0,
+                    getOutOfDetentionCards: 0, inDetention: false, missedTurnsInDetention: 0,
+                    hasHousingVoucher: false, isBankrupt: false,
+                });
+            }
+            propertyData = JSON.parse(JSON.stringify(boardLayout.filter(s => s.type === 'property')));
+            propertyData.forEach(p => {
+                p.owner = null; p.tenancies = 0; p.permanentResidence = false;
+            });
+
+
+            bank.money = 15000;
+            shuffledWelfareCards = shuffleDeck([...welfareCards]);
+            shuffledOpportunityCards = shuffleDeck([...opportunityCards]);
+
+            setupBoard();
+            updatePlayerInfo();
+            updateBoardDisplay();
+            gameStatusMessageP.textContent = "Determining starting player...";
+            currentTurnDisplay.textContent = "Pre-Game Roll";
+
+            rollDiceButton.style.display = 'none';
+            endTurnButton.style.display = 'none';
+            buyPropertyButton.style.display = 'none';
+            developPropertyButton.style.display = 'none';
+            viewPropertyStoryButton.style.display = 'none';
+            detentionActionsDiv.innerHTML = '';
+            preGameRollArea.style.display = 'block';
+            preGameRollResultsDiv.innerHTML = '';
+            preGameRolls = [];
+            preGamePlayerIndex = 0;
+            preGameRollButton.textContent = `Player ${players[preGamePlayerIndex].id + 1}, Roll to Start`;
+            preGameRollButton.disabled = false;
+        }
+
+        function handlePreGameRoll() {
+            const player = players[preGamePlayerIndex];
+            const { totalRoll } = rollDice();
+            preGameRolls.push({ playerId: player.id, roll: totalRoll });
+            preGameRollResultsDiv.innerHTML += `Player ${player.id + 1} rolled: ${totalRoll}<br>`;
+            logEvent(`Player ${player.id + 1} (pre-game) rolled: ${totalRoll}`);
+
+            preGamePlayerIndex++;
+            if (preGamePlayerIndex < numPlayers) {
+                preGameRollButton.textContent = `Player ${players[preGamePlayerIndex].id + 1}, Roll to Start`;
+            } else {
+                preGameRollButton.disabled = true;
+                preGameRollButton.textContent = "All players rolled!";
+                determineStartingPlayer();
+            }
+        }
+
+        function determineStartingPlayer() {
+            preGameRolls.sort((a,b) => b.roll - a.roll);
+            const topRoll = preGameRolls[0].roll;
+            const tiedPlayers = preGameRolls.filter(r => r.roll === topRoll);
+
+            if (tiedPlayers.length > 1) {
+                logEvent(`Tie for highest roll (${topRoll}). Re-rolling tied players: ${tiedPlayers.map(p=>p.playerId+1).join(', ')}.`);
+                preGameRollResultsDiv.innerHTML += `<b>Tie! Re-rolling players: ${tiedPlayers.map(p=>p.playerId+1).join(', ')}</b><br>`;
+                preGameRolls = [];
+                preGamePlayerIndex = 0;
+                const playersToReRoll = tiedPlayers.map(tp => players.find(p => p.id === tp.playerId));
+
+                function setupReRoll(reRollPlayerIndex) {
+                    if (reRollPlayerIndex < playersToReRoll.length) {
+                        const playerToRoll = playersToReRoll[reRollPlayerIndex];
+                        preGameRollButton.textContent = `Player ${playerToRoll.id + 1} (Tie-breaker), Roll`;
+                        preGameRollButton.disabled = false;
+                        preGameRollButton.onclick = () => {
+                            const { totalRoll: tieBreakRoll } = rollDice();
+                            preGameRolls.push({ playerId: playerToRoll.id, roll: tieBreakRoll });
+                            preGameRollResultsDiv.innerHTML += `Player ${playerToRoll.id + 1} (Tie-breaker) rolled: ${tieBreakRoll}<br>`;
+                            logEvent(`Player ${playerToRoll.id + 1} (Tie-breaker) rolled: ${tieBreakRoll}`);
+                            setupReRoll(reRollPlayerIndex + 1);
+                        };
+                    } else {
+                        preGameRollButton.disabled = true;
+                        preGameRollButton.textContent = "Tie-breaker rolls complete!";
+                        determineStartingPlayer();
+                    }
+                }
+                setupReRoll(0);
+                return;
+            }
+
+            const startingPlayerId = preGameRolls[0].playerId;
+            currentPlayerIndex = players.findIndex(p => p.id === startingPlayerId);
+
+            logEvent(`Player ${startingPlayerId + 1} starts the game!`);
+            gameStatusMessageP.textContent = `Player ${startingPlayerId + 1} starts! Game in progress...`;
+            preGameRollArea.style.display = 'none';
+            rollDiceButton.style.display = 'inline-block';
+            currentTurnDisplay.textContent = `Current Turn: ${players[currentPlayerIndex].name}`;
+            if(players[currentPlayerIndex].properties.length > 0 && canDevelopAnyProperty(players[currentPlayerIndex])) {
+                 developPropertyButton.style.display = 'inline-block';
+            }
+        }
+
+
+        function updatePlayerInfo() {
+            playerInfoDiv.innerHTML = '';
+            players.forEach(p => {
+                if (p.isBankrupt) {
+                    const pDiv = document.createElement('div');
+                    pDiv.innerHTML = `<b>${p.name}</b>: BANKRUPT`;
+                    pDiv.style.color = 'grey';
+                    playerInfoDiv.appendChild(pDiv);
+                } else {
+                    const pDiv = document.createElement('div');
+                    pDiv.innerHTML = `<b>${p.name}</b>: £${p.money} | HS: ${p.healthServices} | LegalAids: ${p.getOutOfDetentionCards}`;
+                    if (p.inDetention) pDiv.innerHTML += ` (In Detention - ${p.missedTurnsInDetention} turns missed)`;
+                    playerInfoDiv.appendChild(pDiv);
+                }
+            });
+            if (gameActive && players[currentPlayerIndex] && !players[currentPlayerIndex].isBankrupt) {
+                currentTurnDisplay.textContent = `Current Turn: ${players[currentPlayerIndex].name}`;
+            }
+        }
+
+        function updateBoardDisplay() {
+            players.forEach((p, idx) => {
+                const token = document.getElementById(`player${p.id}-token`);
+                if (!token) return;
+                const currentSpaceEl = document.getElementById(`space-${p.position}`);
+                if (currentSpaceEl) {
+                    const tokensInSpace = Array.from(currentSpaceEl.querySelectorAll('.player-token'));
+                    let baseOffsetX = 5;
+                    let baseOffsetY = 5;
+                    let tokenIndexInSpace = 0;
+                    for(let t of tokensInSpace) {
+                        if(t.id === token.id) break;
+                        tokenIndexInSpace++;
+                    }
+
+                    token.style.left = `${baseOffsetX + (tokenIndexInSpace % 2) * (token.offsetWidth + 2)}px`;
+                    token.style.bottom = `${baseOffsetY + Math.floor(tokenIndexInSpace / 2) * (token.offsetHeight + 2)}px`;
+                    currentSpaceEl.appendChild(token);
+                }
+            });
+
+            propertyData.forEach(prop => {
+                const indicator = document.getElementById(`owner-indicator-${prop.id}`);
+                if (indicator) {
+                    if (prop.owner !== null && players[prop.owner] && !players[prop.owner].isBankrupt) {
+                        const ownerColor = players[prop.owner].id === 0 ? '#e53e3e' :
+                                         players[prop.owner].id === 1 ? '#3182ce' :
+                                         players[prop.owner].id === 2 ? '#38a169' : '#805ad5';
+                        indicator.style.backgroundColor = ownerColor;
+                    } else {
+                        indicator.style.backgroundColor = 'transparent';
+                    }
+                }
+                updateDevelopmentIndicator(prop.id);
+            });
+        }
+
+        function updateAllDevelopmentIndicators() {
+            propertyData.forEach(prop => updateDevelopmentIndicator(prop.id));
+        }
+
+        function updateDevelopmentIndicator(propertyId) {
+            const prop = propertyData.find(p => p.id === propertyId);
+            const devIndicator = document.getElementById(`dev-indicator-${prop.id}`);
+            if (prop && devIndicator) {
+                if (prop.permanentResidence) {
+                    devIndicator.textContent = "PR";
+                } else if (prop.tenancies > 0) {
+                    devIndicator.textContent = `T: ${prop.tenancies}`;
+                } else {
+                    devIndicator.textContent = "";
+                }
+            }
+        }
+
+
+        function rollDice() {
+            const die1 = Math.floor(Math.random() * 6) + 1;
+            const die2 = Math.floor(Math.random() * 6) + 1;
+            const totalRoll = die1 + die2;
+            diceRollDiv.textContent = `${die1} + ${die2} = ${totalRoll}`;
+            return { totalRoll, die1, die2, isDoubles: die1 === die2 };
+        }
+
+        function movePlayer(player, steps) {
+            const oldPosition = player.position;
+            player.position = (player.position + steps) % boardLayout.length;
+
+            if (player.position < oldPosition && !player.inDetention) {
+                player.money += 200;
+                logEvent(`${player.name} passed Go and collected £200.`);
+            }
+            updateBoardDisplay();
+        }
+
+        // Centralized payment function
+        function makePayment(payer, recipient, amount, isRent = false) {
+            if (payer.money >= amount) {
+                payer.money -= amount;
+                if (recipient && recipient !== bank) {
+                    recipient.money += amount;
+                } else { // Payment to bank
+                    bank.money += amount;
+                }
+                logEvent(`${payer.name} paid £${amount} to ${recipient === bank ? "the Bank" : recipient.name}.`);
+                return true;
+            } else {
+                // Not enough money, handle partial payment and bankruptcy
+                let amountPaid = payer.money;
+                if (recipient && recipient !== bank) {
+                    recipient.money += amountPaid;
+                } else {
+                    bank.money += amountPaid;
+                }
+                payer.money = 0;
+                logEvent(`${payer.name} paid their remaining £${amountPaid} to ${recipient === bank ? "the Bank" : recipient.name} and cannot afford the full £${amount}.`);
+                handleBankruptcy(payer, recipient);
+                return false;
+            }
+        }
+
+
+        function handleLandOnSpace(player) {
+            if (player.isBankrupt) return;
+
+            const currentSpace = boardLayout[player.position];
+            logEvent(`${player.name} landed on ${currentSpace.name}.`);
+            buyPropertyButton.style.display = 'none';
+            developPropertyButton.style.display = 'none';
+            viewPropertyStoryButton.style.display = 'none';
+
+            if (currentSpace.type === 'property') {
+                viewPropertyStoryButton.style.display = 'inline-block';
+                const propDetails = propertyData.find(p => p.id === currentSpace.id);
+                 if (propDetails?.owner === player.id) {
+                    if (canDevelopAnyProperty(player)) {
+                        developPropertyButton.style.display = 'inline-block';
+                    }
+                }
+            }
+
+
+            switch (currentSpace.type) {
+                case "go": logEvent(`${player.name} landed on Go.`); break;
+                case "property":
+                    const propDetails = propertyData.find(p => p.id === currentSpace.id);
+                    if (propDetails.owner === null) {
+                        let price = propDetails.price;
+                        if (player.hasHousingVoucher) price = Math.round(price * 0.75);
+                        buyPropertyPriceSpan.textContent = price;
+                        logEvent(`${currentSpace.name} is unowned. Price: £${price}`);
+                        if (player.money >= price) buyPropertyButton.style.display = 'inline-block';
+                        else logEvent(`${player.name} cannot afford ${currentSpace.name}.`);
+                    } else if (propDetails.owner !== player.id && !players[propDetails.owner]?.isBankrupt) {
+                        payRent(player, propDetails); // payRent will use makePayment
+                    } else if (players[propDetails.owner]?.isBankrupt) {
+                        logEvent(`${currentSpace.name} is owned by a bankrupt player. No rent.`);
+                    } else {
+                        logEvent(`${player.name} owns ${currentSpace.name}.`);
+                    }
+                    break;
+                case "welfare": drawCard("welfare", player); break;
+                case "opportunity": drawCard("opportunity", player); break;
+                case "tax":
+                    logEvent(`${player.name} needs to pay £${currentSpace.amount} tax.`);
+                    makePayment(player, bank, currentSpace.amount);
+                    break;
+                case "payout":
+                    logEvent(`${player.name} collects £${currentSpace.amount}.`);
+                    player.money += currentSpace.amount; bank.money -= currentSpace.amount;
+                    break;
+                case "go_to_detention": goToDetention(player); break;
+                case "detention_visiting": logEvent(`${player.name} is just visiting Detention Center.`); break;
+                case "neutral": logEvent(`${currentSpace.name} - no action.`); break;
+            }
+            updatePlayerInfo();
+            if (gameActive) checkWinConditions();
+        }
+
+        function buyCurrentProperty() {
+            const player = players[currentPlayerIndex];
+            if (player.isBankrupt) return;
+            const currentSpace = boardLayout[player.position];
+            if (currentSpace.type !== 'property') return;
+
+            const propDetails = propertyData.find(p => p.id === currentSpace.id);
+            let price = propDetails.price;
+            if (player.hasHousingVoucher) {
+                price = Math.round(price * 0.75);
+                logEvent(`${player.name} uses Housing Voucher! New price for ${propDetails.name}: £${price}`);
+            }
+
+            if (propDetails && propDetails.owner === null) {
+                if(makePayment(player, bank, price)) { // Use makePayment for purchase
+                    propDetails.owner = player.id;
+                    player.properties.push(propDetails.id);
+                    logEvent(`${player.name} bought ${propDetails.name} for £${price}.`);
+                    if(player.hasHousingVoucher && price === Math.round(propDetails.price * 0.75)) player.hasHousingVoucher = false; // Consume voucher
+                    buyPropertyButton.style.display = 'none';
+                    if (canDevelopAnyProperty(player)) developPropertyButton.style.display = 'inline-block';
+                    updatePlayerInfo(); updateBoardDisplay();
+                } else {
+                    logEvent(`${player.name} failed to buy ${propDetails.name} due to insufficient funds after attempting payment.`);
+                }
+            } else { logEvent(`Cannot buy property or already owned.`); }
+            if (gameActive) checkWinConditions();
+        }
+
+        function payRent(player, property) {
+            if (player.isBankrupt) return;
+            const owner = players[property.owner];
+            if (!owner || owner.isBankrupt) {
+                logEvent(`Owner ${owner ? owner.name : 'N/A'} is bankrupt or not found. No rent for ${property.name}.`);
+                return;
+            }
+
+            let rentLevel = 0;
+            if (property.permanentResidence) rentLevel = MAX_TENANCIES + 1;
+            else if (property.tenancies > 0) rentLevel = property.tenancies;
+
+            const rentAmount = property.rent[rentLevel];
+            logEvent(`${player.name} owes £${rentAmount} rent to ${owner.name} for ${property.name}.`);
+            makePayment(player, owner, rentAmount, true); // Pass true for isRent if needed by bankruptcy logic
+            updatePlayerInfo();
+            if (gameActive) checkWinConditions();
+        }
+
+        function handleBankruptcy(player, creditor) {
+            // This function is now primarily for asset transfer after makePayment confirms insolvency.
+            if (!player.isBankrupt) { // Ensure bankruptcy is only processed once
+                logEvent(`${player.name} is officially bankrupt!`);
+                player.isBankrupt = true;
+                // player.money is already 0 or what they could pay
+
+                // Properties return to bank
+                player.properties.forEach(propId => {
+                    const prop = propertyData.find(p => p.id === propId);
+                    if (prop) {
+                        logEvent(`${prop.name} returns to the bank.`);
+                        prop.owner = null;
+                        prop.tenancies = 0;
+                        prop.permanentResidence = false;
+                        updateDevelopmentIndicator(prop.id);
+                    }
+                });
+                player.properties = [];
+
+                // Transfer other assets
+                if (creditor && creditor !== bank) {
+                    logEvent(`Transferring remaining assets from ${player.name} to ${creditor.name}.`);
+                    creditor.getOutOfDetentionCards += player.getOutOfDetentionCards;
+                    creditor.healthServices += player.healthServices;
+                    logEvent(`${creditor.name} receives ${player.getOutOfDetentionCards} Legal Aid card(s) and ${player.healthServices} Health Service(s).`);
+                } else {
+                    logEvent(`Assets of ${player.name} are forfeited to the bank.`);
+                    // Bank effectively reclaims these cards/services to its general supply (not explicitly tracked for bank)
+                }
+                player.getOutOfDetentionCards = 0;
+                player.healthServices = 0;
+
+                const token = document.getElementById(`player${player.id}-token`);
+                if (token) token.style.display = 'none';
+
+                updatePlayerInfo();
+                updateBoardDisplay();
+                checkWinConditions(); // Check if game ends
+            }
+        }
+
+
+        function drawCard(type, player) {
+            if (player.isBankrupt) return;
+            let card;
+            cardDisplayContainer.style.display = 'block';
+            rollDiceButton.disabled = true;
+            endTurnButton.style.display = 'none';
+            developPropertyButton.style.display = 'none';
+            viewPropertyStoryButton.style.display = 'none';
+
+
+            if (type === "welfare") {
+                if (shuffledWelfareCards.length === 0) shuffledWelfareCards = shuffleDeck([...welfareCards]);
+                card = shuffledWelfareCards.pop();
+                cardTypeTitle.textContent = "Welfare Card";
+            } else {
+                if (shuffledOpportunityCards.length === 0) shuffledOpportunityCards = shuffleDeck([...opportunityCards]);
+                card = shuffledOpportunityCards.pop();
+                cardTypeTitle.textContent = "Opportunity Card";
+            }
+            cardMessageP.textContent = card.text;
+            logEvent(`${player.name} drew ${type} card: ${card.text}`);
+
+            cardOkButton.onclick = () => {
+                cardDisplayContainer.style.display = 'none';
+                executeCardAction(player, card);
+                if (gameActive && !player.inDetention && !player.isBankrupt) {
+                    endTurnButton.style.display = 'inline-block';
+                    if (canDevelopAnyProperty(player)) developPropertyButton.style.display = 'inline-block';
+                    const currentLandedSpace = boardLayout[player.position];
+                    if (currentLandedSpace.type === 'property') viewPropertyStoryButton.style.display = 'inline-block';
+
+                } else if (player.inDetention) {
+                    handleDetentionTurn(player);
+                }
+                updatePlayerInfo();
+                if (gameActive) checkWinConditions();
+            };
+        }
+
+        function executeCardAction(player, card) {
+            if (player.isBankrupt) return;
+            logEvent(`Executing card: ${card.action} for ${player.name}`);
+
+            switch (card.action) {
+                case "collect": player.money += card.amount; bank.money -= card.amount; break;
+                case "pay":
+                    logEvent(`${player.name} needs to pay £${card.amount} due to a card.`);
+                    makePayment(player, bank, card.amount);
+                    break;
+                case "gainHealthService": player.healthServices++; break;
+                case "payPerTenancy":
+                    let totalPayment = 0;
+                    player.properties.forEach(propId => {
+                        const prop = propertyData.find(p => p.id === propId);
+                        if (prop) totalPayment += (prop.tenancies * card.amountPer);
+                    });
+                    logEvent(`${player.name} needs to pay £${totalPayment} for Housing Inspection.`);
+                    if (totalPayment > 0) makePayment(player, bank, totalPayment);
+                    else logEvent("No tenancies owned, no payment for Housing Inspection.");
+                    break;
+                case "getOutOfDetentionFree": player.getOutOfDetentionCards++; break;
+                case "moveToNearestPayout":
+                    let currentPos = player.position;
+                    let nearestDist = boardLayout.length; let nearestPos = -1;
+                    for(let i=0; i < boardLayout.length; i++){
+                        const testPos = (currentPos + i) % boardLayout.length;
+                        if(boardLayout[testPos].type === 'payout'){
+                            if (i < nearestDist) { nearestDist = i; nearestPos = testPos; }
+                        }
+                    }
+                    if (nearestPos !== -1) {
+                        if (nearestPos < player.position && nearestDist > 0) { player.money += 200; logEvent(`${player.name} passed Go.`); }
+                        player.position = nearestPos;
+                        logEvent(`${player.name} moved to ${boardLayout[player.position].name}.`);
+                        updateBoardDisplay(); handleLandOnSpace(player);
+                    }
+                    break;
+                case "goToDetentionDirect": goToDetention(player); break;
+                case "housingVoucher": player.hasHousingVoucher = true; break;
+                case "collectFromPlayers":
+                    players.forEach(p => {
+                        if (p.id !== player.id && !p.isBankrupt) {
+                            logEvent(`${p.name} needs to pay £${card.amount} to ${player.name}.`);
+                            makePayment(p, player, card.amount);
+                        }
+                    });
+                    break;
+                case "advanceToGo":
+                    player.position = 0; player.money += 200; updateBoardDisplay();
+                    logEvent(`${player.name} advances to Go, collects £200.`);
+                    handleLandOnSpace(player);
+                    break;
+            }
+        }
+
+        function goToDetention(player) {
+            if (player.isBankrupt) return;
+            player.position = detentionCenterSpaceId;
+            player.inDetention = true;
+            logEvent(`${player.name} is sent to Detention Center.`);
+            updateBoardDisplay();
+            rollDiceButton.disabled = true;
+            buyPropertyButton.style.display = 'none';
+            developPropertyButton.style.display = 'none';
+            viewPropertyStoryButton.style.display = 'none';
+            endTurnButton.style.display = 'inline-block';
+            detentionActionsDiv.innerHTML = '';
+        }
+
+        function handleDetentionTurn(player) {
+            if (player.isBankrupt) return;
+            logEvent(`${player.name} is in Detention. Missed turns: ${player.missedTurnsInDetention}`);
+            rollDiceButton.disabled = true;
+            endTurnButton.style.display = 'none';
+            developPropertyButton.style.display = 'none';
+            viewPropertyStoryButton.style.display = 'none';
+            detentionActionsDiv.innerHTML = '';
+
+            if (player.missedTurnsInDetention >= 2) {
+                logEvent(`${player.name} is automatically released from Detention.`);
+                player.inDetention = false; player.missedTurnsInDetention = 0;
+                detentionActionsDiv.innerHTML = '<p>Automatically released! You can roll now.</p>';
+                rollDiceButton.disabled = false;
+                updatePlayerInfo();
+                return false;
+            }
+
+            // This turn counts as a missed turn if they don't get out
+            player.missedTurnsInDetention++;
+            updatePlayerInfo();
+
+            if (player.getOutOfDetentionCards > 0) {
+                const useCardBtn = document.createElement('button');
+                useCardBtn.textContent = "Use Legal Aid Card";
+                useCardBtn.onclick = () => {
+                    player.getOutOfDetentionCards--; player.inDetention = false; player.missedTurnsInDetention = 0;
+                    logEvent(`${player.name} used Legal Aid card and is free.`);
+                    detentionActionsDiv.innerHTML = '<p>Used Legal Aid card! You can roll now.</p>';
+                    rollDiceButton.disabled = false; updatePlayerInfo();
+                };
+                detentionActionsDiv.appendChild(useCardBtn);
+            }
+            if (player.money >= 50) {
+                const payFineBtn = document.createElement('button');
+                payFineBtn.textContent = "Pay £50 Fine";
+                payFineBtn.onclick = () => {
+                    // Use makePayment to handle the fine
+                    if (makePayment(player, bank, 50)) {
+                        player.inDetention = false; player.missedTurnsInDetention = 0;
+                        logEvent(`${player.name} paid £50 and is free.`);
+                        detentionActionsDiv.innerHTML = '<p>Paid fine! You can roll now.</p>';
+                        rollDiceButton.disabled = false;
+                    } else {
+                        // This case should ideally not happen if player.money >= 50 is checked,
+                        // but handleBankruptcy would have been called by makePayment if it did.
+                        detentionActionsDiv.innerHTML = '<p>Failed to pay fine (should not happen if enough money).</p>';
+                        endTurnButton.style.display = 'inline-block'; // Still end turn if something went wrong
+                    }
+                    updatePlayerInfo();
+                };
+                detentionActionsDiv.appendChild(payFineBtn);
+            }
+            const rollDoublesBtn = document.createElement('button');
+            rollDoublesBtn.textContent = "Roll for Doubles";
+            rollDoublesBtn.onclick = () => {
+                const { totalRoll, isDoubles } = rollDice();
+                if (isDoubles) {
+                    player.inDetention = false; player.missedTurnsInDetention = 0;
+                    logEvent(`${player.name} rolled doubles and is free! Moves ${totalRoll}.`);
+                    detentionActionsDiv.innerHTML = `<p>Rolled doubles! Moving ${totalRoll}.</p>`;
+                    movePlayer(player, totalRoll); handleLandOnSpace(player);
+                    endTurnButton.style.display = 'inline-block';
+                } else {
+                    logEvent(`${player.name} failed to roll doubles. Stays in Detention.`);
+                    detentionActionsDiv.innerHTML = `<p>Failed to roll doubles. Stays in Detention. End your turn.</p>`;
+                    endTurnButton.style.display = 'inline-block';
+                }
+                updatePlayerInfo();
+            };
+            detentionActionsDiv.appendChild(rollDoublesBtn);
+
+            // If no options were taken, the turn is missed, and they must click End Turn.
+            // The above options either free the player (enabling rollDice) or lead to End Turn.
+            return true;
+        }
+
+        function canDevelopAnyProperty(player) {
+            if (player.isBankrupt) return false;
+            return player.properties.some(propId => {
+                const prop = propertyData.find(p => p.id === propId);
+                if (!prop || prop.permanentResidence) return false;
+
+                const groupProperties = propertyData.filter(p => p.groupId === prop.groupId);
+                const ownsAllInGroup = groupProperties.every(gp => players[player.id].properties.includes(gp.id));
+                if (!ownsAllInGroup) return false;
+
+                return (prop.tenancies < MAX_TENANCIES) || (prop.tenancies === MAX_TENANCIES && !prop.permanentResidence);
+            });
+        }
+
+
+        function showDevelopmentOptions() {
+            const player = players[currentPlayerIndex];
+            if (player.isBankrupt) return;
+
+            developPropertyOptionsDiv.innerHTML = '';
+            let canDevelopSomething = false;
+
+            player.properties.forEach(propId => {
+                const prop = propertyData.find(p => p.id === propId);
+                if (!prop) return;
+
+                const groupProperties = propertyData.filter(pItem => pItem.groupId === prop.groupId);
+                const ownsAllInGroup = groupProperties.every(gp => player.properties.includes(gp.id));
+
+
+                if (ownsAllInGroup) {
+                    const propDiv = document.createElement('div');
+                    propDiv.style.marginBottom = '10px';
+                    propDiv.innerHTML = `<b>${prop.name}</b> (Currently: ${prop.permanentResidence ? 'PR' : prop.tenancies + ' Tenancies'})`;
+
+                    const insightButton = document.createElement('button');
+                    insightButton.textContent = "Get Council Insight ✨";
+                    insightButton.classList.add('gemini-button');
+                    insightButton.onclick = () => getCouncilInsight(prop.groupId, prop.tenancies, prop.permanentResidence, `council-insight-result-${prop.id}`);
+                    propDiv.appendChild(insightButton);
+
+                    const insightResultDiv = document.createElement('div');
+                    insightResultDiv.id = `council-insight-result-${prop.id}`;
+                    insightResultDiv.classList.add('council-insight-area');
+                    propDiv.appendChild(insightResultDiv);
+
+
+                    if (!prop.permanentResidence) {
+                        if (prop.tenancies < MAX_TENANCIES) {
+                            if (player.money >= TENANCY_COST) {
+                                const buyTenancyBtn = document.createElement('button');
+                                buyTenancyBtn.textContent = `Buy Tenancy (£${TENANCY_COST})`;
+                                buyTenancyBtn.onclick = () => buyTenancy(prop.id);
+                                propDiv.appendChild(buyTenancyBtn);
+                                canDevelopSomething = true;
+                            } else {
+                                propDiv.innerHTML += ` <small>(Need £${TENANCY_COST})</small>`;
+                            }
+                        } else if (prop.tenancies === MAX_TENANCIES) {
+                            if (player.money >= PR_COST) {
+                                const buyPRBtn = document.createElement('button');
+                                buyPRBtn.textContent = `Buy Permanent Residence (£${PR_COST})`;
+                                buyPRBtn.onclick = () => buyPermanentResidence(prop.id);
+                                propDiv.appendChild(buyPRBtn);
+                                canDevelopSomething = true;
+                            } else {
+                                 propDiv.innerHTML += ` <small>(Need £${PR_COST} for PR)</small>`;
+                            }
+                        }
+                    } else {
+                        propDiv.innerHTML += ` <small>(Fully Developed)</small>`;
+                    }
+                     developPropertyOptionsDiv.appendChild(propDiv);
+                }
+            });
+
+             if (!player.properties.some(pId => {
+                const prop = propertyData.find(p => p.id === pId);
+                if(!prop) return false;
+                const groupProps = propertyData.filter(item => item.groupId === prop.groupId);
+                return groupProps.every(gp => player.properties.includes(gp.id)) && (!prop.permanentResidence);
+            })) {
+                 if (!canDevelopSomething) {
+                    developPropertyOptionsDiv.innerHTML = "<p>No properties currently eligible for development, or insufficient funds, or you don't own the full color group.</p>";
+                 }
+            }
+
+
+            developPropertyNameH3.textContent = "Develop Your Properties";
+            developPropertyContainer.style.display = 'block';
+            rollDiceButton.style.display = 'none';
+            endTurnButton.style.display = 'none';
+            buyPropertyButton.style.display = 'none';
+            developPropertyButton.style.display = 'none';
+            viewPropertyStoryButton.style.display = 'none';
+        }
+
+        function buyTenancy(propertyId) {
+            const player = players[currentPlayerIndex];
+            const prop = propertyData.find(p => p.id === propertyId);
+
+            if (prop && prop.tenancies < MAX_TENANCIES && !prop.permanentResidence) {
+                const groupProperties = propertyData.filter(pGrp => pGrp.groupId === prop.groupId);
+                const ownsAllInGroup = groupProperties.every(gp => player.properties.includes(gp.id));
+                if (!ownsAllInGroup) {
+                    logEvent(`Error: Cannot buy tenancy for ${prop.name}, player doesn't own full group.`);
+                    return;
+                }
+                if (makePayment(player, bank, TENANCY_COST)) {
+                    prop.tenancies++;
+                    logEvent(`${player.name} bought a tenancy for ${prop.name}. Now has ${prop.tenancies}.`);
+                    updatePlayerInfo();
+                    updateDevelopmentIndicator(prop.id);
+                    showDevelopmentOptions(); // Refresh options
+                    if (gameActive) checkWinConditions();
+                } else {
+                     logEvent(`${player.name} failed to buy tenancy for ${prop.name} due to insufficient funds.`);
+                }
+            }
+        }
+
+        function buyPermanentResidence(propertyId) {
+            const player = players[currentPlayerIndex];
+            const prop = propertyData.find(p => p.id === propertyId);
+            if (prop && prop.tenancies === MAX_TENANCIES && !prop.permanentResidence) {
+                const groupProperties = propertyData.filter(pGrp => pGrp.groupId === prop.groupId);
+                const ownsAllInGroup = groupProperties.every(gp => player.properties.includes(gp.id));
+                if (!ownsAllInGroup) {
+                    logEvent(`Error: Cannot buy PR for ${prop.name}, player doesn't own full group.`);
+                    return;
+                }
+
+                if(makePayment(player, bank, PR_COST)) {
+                    prop.permanentResidence = true;
+                    logEvent(`${player.name} bought Permanent Residence for ${prop.name}.`);
+                    updatePlayerInfo();
+                    updateDevelopmentIndicator(prop.id);
+                    showDevelopmentOptions();
+                    if (gameActive) checkWinConditions();
+                } else {
+                    logEvent(`${player.name} failed to buy PR for ${prop.name} due to insufficient funds.`);
+                }
+            }
+        }
+
+
+        function checkWinConditions() {
+            if (!gameActive) return false;
+            let activePlayersList = players.filter(p => !p.isBankrupt);
+
+            if (bank.money < 0) {
+                let maxAssets = -Infinity; let winner = null;
+                activePlayersList.forEach(p => {
+                    let playerAssets = p.money;
+                    p.properties.forEach(propId => {
+                        const prop = propertyData.find(pr => pr.id === propId);
+                        if(prop) {
+                            playerAssets += prop.price;
+                            playerAssets += prop.tenancies * TENANCY_COST;
+                            if(prop.permanentResidence) playerAssets += PR_COST;
+                        }
+                    });
+                    playerAssets += p.healthServices * 100;
+                    if (playerAssets > maxAssets) { maxAssets = playerAssets; winner = p; }
+                });
+                if (winner) {
+                    const winMsg = `Bank is bankrupt! ${winner.name} wins with most assets (£${maxAssets})!`;
+                    logEvent(winMsg); gameStatusMessageP.textContent = winMsg;
+                    endGame(); return true;
+                }
+            }
+
+            if (activePlayersList.length === 1 && numPlayers > 1) { // Ensure game started with more than 1 player
+                const winMsg = `${activePlayersList[0].name} is the last player standing and wins!`;
+                logEvent(winMsg); gameStatusMessageP.textContent = winMsg;
+                endGame(); return true;
+            }
+            if (activePlayersList.length === 0 && numPlayers > 0) {
+                 logEvent("All players are bankrupt! The bank wins?");
+                 gameStatusMessageP.textContent = "All players are bankrupt! No winner.";
+                 endGame(); return true;
+            }
+            return false;
+        }
+
+        function endGame() {
+            gameActive = false;
+            rollDiceButton.disabled = true;
+            endTurnButton.disabled = true;
+            buyPropertyButton.disabled = true;
+            developPropertyButton.disabled = true;
+            viewPropertyStoryButton.disabled = true;
+            detentionActionsDiv.innerHTML = '';
+            developPropertyContainer.style.display = 'none';
+            currentTurnDisplay.textContent = "Game Over!";
+        }
+
+
+        function logEvent(message) {
+            console.log(message);
+        }
+
+        function nextTurn() {
+            if (!gameActive || checkWinConditions()) return;
+            let nextPlayerFound = false;
+            let attempts = 0;
+            while(!nextPlayerFound && attempts < numPlayers * 2) {
+                currentPlayerIndex = (currentPlayerIndex + 1) % numPlayers;
+                if (!players[currentPlayerIndex].isBankrupt) {
+                    nextPlayerFound = true;
+                }
+                attempts++;
+            }
+
+            if (!nextPlayerFound) {
+                logEvent("No active players left for next turn. Game should have ended.");
+                if (gameActive) endGame(); // Ensure game ends if somehow missed by checkWinConditions
+                return;
+            }
+
+
+            const nextPlayer = players[currentPlayerIndex];
+            logEvent(`--- ${nextPlayer.name}'s turn ---`);
+            currentTurnDisplay.textContent = `Current Turn: ${nextPlayer.name}`;
+
+            rollDiceButton.disabled = false;
+            endTurnButton.style.display = 'none';
+            buyPropertyButton.style.display = 'none';
+            developPropertyButton.style.display = 'none';
+            viewPropertyStoryButton.style.display = 'none';
+             if (canDevelopAnyProperty(nextPlayer)) {
+                developPropertyButton.style.display = 'inline-block';
+            }
+            detentionActionsDiv.innerHTML = '';
+
+            if (nextPlayer.inDetention) {
+                handleDetentionTurn(nextPlayer);
+            }
+            updatePlayerInfo();
+        }
+
+        // --- Gemini API Call Function ---
+        async function callGeminiAPI(prompt) {
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            const payload = {
+                contents: [{ role: "user", parts: [{ text: prompt }] }]
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    const errorBody = await response.text();
+                    throw new Error(`API request failed with status ${response.status}: ${errorBody}`);
+                }
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    return result.candidates[0].content.parts[0].text;
+                } else {
+                    console.error("Unexpected response structure from Gemini API:", result);
+                    return "Could not retrieve a valid response from the storyteller.";
+                }
+            } catch (error) {
+                console.error("Error calling Gemini API:", error);
+                return `Error: ${error.message}. Please check console for details.`;
+            }
+        }
+
+        async function getPropertyStory() {
+            const player = players[currentPlayerIndex];
+            const currentSpace = boardLayout[player.position];
+            if (currentSpace.type !== 'property') return;
+
+            llmResponseTitle.textContent = `Story of ${currentSpace.name}`;
+            llmResponseContent.textContent = "Crafting a tale for this location...";
+            llmResponseModal.style.display = 'flex';
+
+            const prompt = `You are a storyteller for a board game called Migrantopoly. Generate a very short, fictional, and thematic backstory (2-3 sentences) for the property called "${currentSpace.name}". The tone should be slightly gritty, reflecting the challenges and hopes of migrants.`;
+            const story = await callGeminiAPI(prompt);
+            llmResponseContent.textContent = story;
+        }
+
+        async function getCouncilInsight(groupId, currentTenancies, hasPR, resultDivId) {
+            const resultDiv = document.getElementById(resultDivId);
+            if (!resultDiv) return;
+
+            resultDiv.textContent = "Consulting the council records...";
+
+            let developmentStage = "undeveloped";
+            if (hasPR) {
+                developmentStage = "fully developed with Permanent Residence";
+            } else if (currentTenancies > 0) {
+                developmentStage = `developed with ${currentTenancies} tenanc${currentTenancies > 1 ? 'ies' : 'y'}`;
+            }
+
+            const prompt = `In the game Migrantopoly, a player owns all properties in the "${groupId}" group. This area is currently ${developmentStage}. Provide a short, thematic piece of "council insight" or "local sentiment" (1-2 sentences) about the prospects or challenges of further developing this area. The tone should be bureaucratic or reflect local opinions, fitting a game about navigating migrant life.`;
+            const insight = await callGeminiAPI(prompt);
+            resultDiv.textContent = insight;
+        }
+
+
+        // --- Event Listeners ---
+        preGameRollButton.addEventListener('click', handlePreGameRoll);
+
+        rollDiceButton.addEventListener('click', () => {
+            if (!gameActive) return;
+            const player = players[currentPlayerIndex];
+            if (player.isBankrupt || player.inDetention) {
+                logEvent("Cannot roll dice now (bankrupt or in detention - use detention options).");
+                if(player.inDetention) handleDetentionTurn(player);
+                return;
+            }
+
+            const { totalRoll, isDoubles } = rollDice();
+            movePlayer(player, totalRoll);
+            handleLandOnSpace(player);
+
+            if (!gameActive) return;
+
+            // Doubles rule: In this ruleset, doubles on a normal turn do NOT grant an extra turn.
+            // The turn ends after actions are resolved.
+            rollDiceButton.disabled = true;
+            if (cardDisplayContainer.style.display === 'none' && developPropertyContainer.style.display === 'none' && detentionActionsDiv.innerHTML === '') {
+                 // Only show end turn if no other modal/action panel is active
+                endTurnButton.style.display = 'inline-block';
+            }
+            updatePlayerInfo();
+        });
+
+        endTurnButton.addEventListener('click', () => {
+            if (!gameActive) return;
+            nextTurn();
+        });
+
+        buyPropertyButton.addEventListener('click', () => {
+            if (!gameActive) return;
+            buyCurrentProperty();
+        });
+
+        developPropertyButton.addEventListener('click', () => {
+            if (!gameActive) return;
+            showDevelopmentOptions();
+        });
+        closeDevelopButton.addEventListener('click', () => {
+            developPropertyContainer.style.display = 'none';
+            const player = players[currentPlayerIndex];
+            if (!player.isBankrupt && !player.inDetention) {
+                if (rollDiceButton.disabled && endTurnButton.style.display === 'none') {
+                     endTurnButton.style.display = 'inline-block';
+                } else if (!rollDiceButton.disabled) {
+                    rollDiceButton.style.display = 'inline-block';
+                }
+
+
+                if (canDevelopAnyProperty(player)) {
+                     developPropertyButton.style.display = 'inline-block';
+                }
+                const currentLandedSpace = boardLayout[player.position];
+                if (currentLandedSpace.type === 'property') {
+                    viewPropertyStoryButton.style.display = 'inline-block';
+                }
+
+            } else if (player.inDetention) {
+                handleDetentionTurn(player);
+            }
+        });
+        viewPropertyStoryButton.addEventListener('click', getPropertyStory);
+        llmModalOkButton.addEventListener('click', () => {
+            llmResponseModal.style.display = 'none';
+        });
+
+
+        // --- Start Game ---
+        initializeGame();
+
+    </script>
+</body>
+</html>
