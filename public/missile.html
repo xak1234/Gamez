@@ -647,8 +647,7 @@ function updateMissiles() {
             for (let e of explosions) {
                 let d = Math.sqrt((em.x - e.x) ** 2 + (em.y - e.y) ** 2);
                 if (d < e.r) {
-                    score += 100;
-                    playExplosionSound();
+                    onMissileDestroyed(em.x, em.y, true);
                     enemyMissiles.splice(i, 1);
                     collided = true;
                     break;
@@ -678,8 +677,7 @@ function updateMissiles() {
             for (let e of explosions) {
                 let d = Math.sqrt((em.x - e.x) ** 2 + (em.y - e.y) ** 2);
                 if (d < e.r) {
-                    score += 100;
-                    playExplosionSound();
+                    onMissileDestroyed(em.x, em.y, true);
                     enemyMissiles.splice(i, 1);
                     break;
                 }
@@ -749,7 +747,10 @@ function updateExplosions() {
         let e = explosions[i];
         e.frame++;
         if (e.isCityExplosion) {
-            // Larger, faster city explosions
+            if (e.frame === 1) {
+                createExplosion(e.x, e.y, 40, '#ff8');
+                addScreenShake(15);
+            }
             if (e.frame < 10) {
                 e.r += 12;
             } else if (e.frame < 20) {
@@ -761,6 +762,9 @@ function updateExplosions() {
                 }
             }
         } else if (e.isSupplyExplosion) {
+            if (e.frame === 1) {
+                createExplosion(e.x, e.y, 20, '#8f8');
+            }
             // Supply drop explosion (bouncy effect)
             if (e.frame < 8) {
                 e.r += 7;
@@ -777,6 +781,10 @@ function updateExplosions() {
                 }
             }
         } else {
+            if (e.frame === 1) {
+                createExplosion(e.x, e.y, 15, '#fff');
+                addScreenShake(5);
+            }
             // Regular explosions
             if (e.frame < 10) {
                 e.r += 5;
@@ -790,6 +798,42 @@ function updateExplosions() {
             }
         }
     }
+
+    // Update particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+        if (!particles[i].update()) {
+            particles.splice(i, 1);
+        }
+    }
+
+    // Update combo timer
+    if (comboTimer > 0) {
+        comboTimer--;
+        if (comboTimer === 0) {
+            comboCount = 0;
+            comboMultiplier = 1;
+        }
+    }
+
+    // Update combo texts
+    for (let i = comboTexts.length - 1; i >= 0; i--) {
+        let text = comboTexts[i];
+        text.life--;
+        text.y -= 1;
+        if (text.life <= 0) {
+            comboTexts.splice(i, 1);
+        }
+    }
+
+    // Update power-ups
+    for (let i = powerUps.length - 1; i >= 0; i--) {
+        if (!powerUps[i].update()) {
+            powerUps.splice(i, 1);
+        }
+    }
+
+    // Screen shake decay
+    screenShake *= 0.9;
 }
 
 function startLevel(lv) {
@@ -1077,37 +1121,173 @@ function drawHelperNukes() {
     }
 }
 
+// Add particle system
+let particles = [];
+
+class Particle {
+    constructor(x, y, vx, vy, color, life = 60, size = 2) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.color = color;
+        this.life = life;
+        this.maxLife = life;
+        this.size = size;
+    }
+
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += 0.1; // gravity
+        this.life--;
+        return this.life > 0;
+    }
+
+    draw(ctx) {
+        ctx.globalAlpha = this.life / this.maxLife;
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x - this.size/2, this.y - this.size/2, this.size, this.size);
+        ctx.globalAlpha = 1;
+    }
+}
+
+// Add combo system
+let comboCount = 0;
+let comboTimer = 0;
+let comboTimeout = 120; // frames
+let comboMultiplier = 1;
+let comboTexts = [];
+
+// Add power-up system
+let powerUps = [];
+const POWERUP_TYPES = {
+    RAPID_FIRE: 'rapid',
+    MULTI_SHOT: 'multi',
+    SHIELD: 'shield'
+};
+
+class PowerUp {
+    constructor(x, y, type) {
+        this.x = x;
+        this.y = y;
+        this.type = type;
+        this.vy = 1;
+        this.collected = false;
+        this.pulsePhase = 0;
+    }
+
+    update() {
+        this.y += this.vy;
+        this.pulsePhase += 0.1;
+        return this.y < h && !this.collected;
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.globalAlpha = 0.7 + Math.sin(this.pulsePhase) * 0.3;
+        ctx.fillStyle = this.type === POWERUP_TYPES.RAPID_FIRE ? '#ff0' :
+                       this.type === POWERUP_TYPES.MULTI_SHOT ? '#0ff' : '#f0f';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 15, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+    }
+}
+
+// Enhanced explosion effects
+function createExplosion(x, y, size, color) {
+    const particleCount = size * 2;
+    for (let i = 0; i < particleCount; i++) {
+        const angle = (i / particleCount) * Math.PI * 2;
+        const speed = 2 + Math.random() * 3;
+        particles.push(new Particle(
+            x,
+            y,
+            Math.cos(angle) * speed,
+            Math.sin(angle) * speed,
+            color,
+            30 + Math.random() * 30
+        ));
+    }
+}
+
+// Screen shake effect
+let screenShake = 0;
+function addScreenShake(amount) {
+    screenShake = Math.min(screenShake + amount, 20);
+}
+
 // Main loop
 function gameLoop() {
+    ctx.save();
+    
+    // Apply screen shake
+    if (screenShake > 0.5) {
+        ctx.translate(
+            Math.random() * screenShake - screenShake/2,
+            Math.random() * screenShake - screenShake/2
+        );
+    }
+
     ctx.clearRect(0, 0, w, h);
     
-    // Draw background image
     if (bgImage.complete) {
         ctx.drawImage(bgImage, 0, 0, w, h);
     } else {
-        // Fallback if image not loaded
         ctx.fillStyle = "#000";
         ctx.fillRect(0, 0, w, h);
-        // Make sure it loads for next frame
         bgImage.onload = () => requestAnimationFrame(gameLoop);
     }
     
-    document.getElementById("score").innerHTML = `Score: ${score} | Level: ${level}`;
+    document.getElementById("score").innerHTML = 
+        `Score: ${score} | Level: ${level}${comboMultiplier > 1 ? ` | Combo: x${comboMultiplier}` : ''}`;
+
     drawCityBackground();
     drawTitle();
     drawCities();
     drawMissiles();
     drawBombs();
     drawExplosions();
+    drawHelperNukes();
+
+    // Draw particles
+    for (const particle of particles) {
+        particle.draw(ctx);
+    }
+
+    // Draw power-ups
+    for (const powerUp of powerUps) {
+        powerUp.draw(ctx);
+    }
+
+    // Draw combo texts
+    ctx.font = "24px 'Press Start 2P'";
+    for (const text of comboTexts) {
+        ctx.fillStyle = `rgba(255,255,255,${text.life/60})`;
+        ctx.fillText(text.text, text.x, text.y);
+    }
+
+    // Draw active combo
+    if (comboCount >= 3) {
+        ctx.font = "20px 'Press Start 2P'";
+        ctx.fillStyle = "#ff0";
+        ctx.fillText(`COMBO x${comboMultiplier}`, 20, 40);
+    }
+
     if (gameOver) {
         drawGameOver();
         updateMushroomCloud();
         drawMushroomCloud();
-        // Draw clouds on top at the end
         updateClouds();
         drawClouds();
+        ctx.restore();
         return;
     }
+
     updateMissiles();
     updateExplosions();
     updateScreenFlash();
@@ -1122,7 +1302,7 @@ function gameLoop() {
         gameOver = true;
     }
 
-    // Level up check: all missiles for this level launched and none left on screen
+    // Level up check
     if (!gameOver && !levelingUp && missilesLaunched >= missilesThisLevel && enemyMissiles.length === 0) {
         levelingUp = true;
         setTimeout(() => {
@@ -1131,11 +1311,37 @@ function gameLoop() {
         }, 1200);
     }
 
-    // Draw clouds last so they appear on top of everything
+    // Draw clouds last
     updateClouds();
     drawClouds();
 
+    ctx.restore();
     requestAnimationFrame(gameLoop);
+}
+
+// Enhance missile destruction with combo system
+function onMissileDestroyed(x, y, wasEnemy) {
+    if (wasEnemy) {
+        comboTimer = comboTimeout;
+        comboCount++;
+        if (comboCount >= 3) {
+            comboMultiplier = Math.min(4, 1 + Math.floor(comboCount / 3));
+            comboTexts.push({
+                text: `${comboCount}x COMBO!`,
+                x: x,
+                y: y,
+                life: 60
+            });
+        }
+        
+        // Chance to spawn power-up
+        if (Math.random() < 0.1) {
+            const type = Object.values(POWERUP_TYPES)[Math.floor(Math.random() * 3)];
+            powerUps.push(new PowerUp(x, y, type));
+        }
+
+        score += 100 * comboMultiplier;
+    }
 }
 
 // Missile spawn interval
