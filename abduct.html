@@ -1,0 +1,1872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Abductor v4</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #000010; /* Dark space blue */
+            display: flex;
+            flex-direction: column; 
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden; /* Prevents scrollbars */
+            font-family: 'Arial', sans-serif;
+            color: white;
+        }
+
+        #game-container {
+            position: relative; 
+        }
+
+        canvas {
+    border: 1px solid #2a2a55;
+    display: block;
+    background-color: #080818;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+    max-width: 100%;
+    max-height: 90vh;
+    box-shadow: 0 0 15px rgba(100, 100, 255, 0.5);
+    position: relative; /* Ensure it's positioned correctly */
+    z-index: 1; /* Ensure it's above other elements */
+}
+
+        #ui-container {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 8px 20px;
+            background-color: rgba(0, 0, 20, 0.6);
+            border-radius: 8px;
+            z-index: 10;
+            border: 1px solid rgba(100, 100, 255, 0.3);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        #level, #lives {
+            margin: 0;
+            font-size: clamp(14px, 2.5vw, 20px); 
+            color: #e0e0ff;
+            text-shadow: 0 0 5px #8888ff;
+            white-space: nowrap;
+        }
+
+        #touch-controls {
+            display: none; 
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100px; 
+            z-index: 20;
+            pointer-events: none; 
+        }
+
+        .touch-button {
+            position: absolute;
+            bottom: 20px;
+            width: 60px;
+            height: 60px;
+            background-color: rgba(100, 100, 200, 0.5);
+            border: 2px solid rgba(200, 200, 255, 0.8); 
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px; 
+            font-weight: bold;
+            user-select: none;
+            pointer-events: auto; 
+            box-shadow: 0 0 12px rgba(180,180,255,0.6); 
+            transition: background-color 0.1s, transform 0.1s;
+        }
+        .touch-button:active {
+            background-color: rgba(120, 120, 220, 0.7);
+            transform: scale(0.95);
+        }
+        #touch-left { left: 20px; content: "←"; }
+        #touch-right { left: 100px; content: "→"; }
+        #touch-jump { right: 100px; content: "↑"; } 
+        #touch-shoot-horizontal { right: 20px; content: "→S"; } 
+
+
+        #message-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0,0,0,0.7);
+            color: white;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            z-index: 100;
+            border: 1px solid rgba(85, 119, 255, 0.7);
+            box-shadow: 0 0 10px rgba(85, 119, 255, 0.5);
+            display: none;
+            min-width: 200px;
+            max-width: 250px;
+            -webkit-backdrop-filter: blur(3px);
+            backdrop-filter: blur(3px);
+        }
+
+        #message-box h2 {
+            margin: 0 0 8px 0;
+            color: #ffdddd;
+            font-size: 18px;
+        }
+
+        #message-box p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+
+        #restart-button {
+            padding: 6px 15px;
+            margin-top: 10px;
+            background-color: #5577ff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        #restart-button:hover {
+            background-color: #7799ff;
+        }
+
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="ui-container">
+            <div id="level">Level: 1</div>
+            <div id="lives">Lives: 3</div>
+        </div>
+        <canvas id="gameCanvas"></canvas>
+        <div id="message-box">
+            <h2>Game Over</h2>
+            <button id="restart-button">Play Again</button>
+        </div>
+    </div>
+
+    <audio id="bgMusic" src="oxy.mp3" loop preload="auto"></audio>
+    <audio id="laserSound" src="laser.mp3" preload="auto"></audio>
+    <audio id="enemyLaserSound" src="enemylaser.mp3" preload="auto"></audio>
+
+    <div id="touch-controls">
+        <div class="touch-button" id="touch-left">◀</div>
+        <div class="touch-button" id="touch-right">▶</div>
+        <div class="touch-button" id="touch-jump">▲</div>
+        <div class="touch-button" id="touch-shoot-horizontal">▶S</div>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const bgMusic = document.getElementById('bgMusic');
+        const laserSound = document.getElementById('laserSound');
+        const enemyLaserSound = document.getElementById('enemyLaserSound');
+        bgMusic.volume = 0.7; // Set initial volume to 70%
+        laserSound.volume = 0.4;
+        enemyLaserSound.volume = 0.3;
+        // const scoreDisplay = document.getElementById('score'); // Score display is commented out in HTML
+        const levelDisplay = document.getElementById('level');
+        const livesDisplay = document.getElementById('lives');
+        const gameContainer = document.getElementById('game-container');
+        const messageBox = document.getElementById('message-box');
+        const messageTitle = document.getElementById('message-title');
+        const messageReason = document.getElementById('message-reason');
+        const messageFinalScore = document.getElementById('message-final-score');
+        let restartButton = document.getElementById('restart-button'); 
+
+        // --- Assets & Loading ---
+        const astronautSprites = new Image();
+        let spritesLoaded = false;
+        let actualSpriteWidth = 0; 
+        let actualSpriteHeight = 0;
+        // IMPORTANT: This game requires an image file named "astronaut_sprites.png"
+        // to be in the same directory as this HTML file.
+        astronautSprites.src = 'astronaut_sprites.png'; 
+
+        // --- Game State & Settings ---
+        let currentLevel = 1;
+        let gameSpeedFactor = 1; 
+
+        const GAME_STATE = {
+            INTRO: 'INTRO',
+            PLAYING: 'PLAYING',
+            PLAYER_DIED: 'PLAYER_DIED',
+            GAME_OVER: 'GAME_OVER'
+        };
+        let currentGameState = GAME_STATE.INTRO;
+
+        const IS_MOBILE = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        let canvasWidth, canvasHeight;
+
+        // --- Canvas & Responsiveness ---
+        function setCanvasDimensions() {
+            const aspectRatio = 16 / 9;
+            let newWidth, newHeight;
+
+            // Different sizing for mobile
+            if (IS_MOBILE) {
+                newHeight = window.innerHeight * 0.95; // Use 95% of viewport height on mobile
+                newWidth = newHeight * aspectRatio;
+                
+                // If width is too wide, adjust based on width instead
+                if (newWidth > window.innerWidth * 0.98) {
+                    newWidth = window.innerWidth * 0.98;
+                    newHeight = newWidth / aspectRatio;
+                }
+            } else {
+                // Desktop sizing
+                if (window.innerWidth / window.innerHeight > aspectRatio) {
+                    newHeight = window.innerHeight * 0.85;
+                    newWidth = newHeight * aspectRatio;
+                } else {
+                    newWidth = window.innerWidth * 0.95;
+                    newHeight = newWidth / aspectRatio;
+                }
+            }
+
+            // Clamp canvas size
+            canvas.width = Math.max(320, Math.min(newWidth, 1280));
+            canvas.height = Math.max(180, Math.min(newHeight, 720));
+            
+            canvasWidth = canvas.width;
+            canvasHeight = canvas.height;
+
+            gameContainer.style.width = canvasWidth + 'px';
+            gameContainer.style.height = canvasHeight + 'px';
+
+            // Adjust touch controls position for mobile
+            if (IS_MOBILE) {
+                const touchControls = document.getElementById('touch-controls');
+                touchControls.style.bottom = '2vh';
+            }
+        }
+
+        // --- Player Object ---
+        const player = {
+            x: 50, y: 0, width: 20, height: 35, // Reduced from 30x50 to 20x35
+            lives: 3,
+            speed: 2.5, jumpForce: 9.5, velocityY: 0, gravity: 0.45, // Movement physics
+            isJumping: false, onGround: false, canShoot: true, shootCooldown: 350, 
+            lastShotTime: 0, isAttachedToUFO: false,
+            walkFrame: 0, 
+            walkCycle: [0, 1, 2, 3], // Sprite animation frames for walking
+            walkAnimationSpeed: 0.2, 
+            isMovingHorizontally: false,
+            facingDirection: 1, // 1 for right, -1 for left
+            
+            spriteSheet: null, 
+            spriteWidth: 0,    // Width of a single sprite frame
+            spriteHeight: 0,   // Height of a single sprite frame
+
+            // Jetpack properties
+            jetpackForce: 6, 
+            maxJetpackUses: 1, 
+            currentJetpackUses: 0, 
+            lastJumpPressTime: 0, 
+            jetpackWindow: 200, // Time window (ms) for double-press to activate jetpack
+            jetpackParticles: [],
+            maxJetpackParticles: 25, // Increased from 15
+            jetpackActive: false,
+            jetpackColor1: '#ff8800', // Brighter orange core
+            jetpackColor2: '#ff3300', // More red outer
+            jetpackColor3: '#ffff00', // Yellow highlight
+            jetpackFuel: 100, // New property for fuel
+            jetpackFuelMax: 100,
+            jetpackFuelDrain: 1.2, // Drain rate per frame
+            jetpackFuelRecharge: 2, // Recharge rate per frame when on ground
+            
+            draw: function() {
+                if (!spritesLoaded || !this.spriteSheet) return;
+
+                // Draw enhanced jetpack flame effect when active
+                if (this.jetpackActive && !this.isAttachedToUFO) {
+                    ctx.save();
+                    
+                    // Update existing particles
+                    this.jetpackParticles = this.jetpackParticles.filter(particle => {
+                        particle.life -= 0.1;
+                        if (particle.life <= 0) return false;
+                        
+                        particle.x += particle.vx;
+                        particle.y += particle.vy;
+                        particle.size *= 0.9;
+                        return true;
+                    });
+
+                    // Add new particles when jetpack is active
+                    if (this.jetpackParticles.length < this.maxJetpackParticles) {
+                        const baseX = this.x + this.width * 0.3;
+                        const baseY = this.y + this.height * 0.7;
+                        
+                        this.jetpackParticles.push({
+                            x: baseX + (Math.random() - 0.5) * 4,
+                            y: baseY + (Math.random() - 0.5) * 4,
+                            vx: (Math.random() - 0.5) * 2 - this.facingDirection,
+                            vy: Math.random() * 2 + 2,
+                            size: Math.random() * 6 + 4,
+                            life: Math.random() * 0.5 + 0.5
+                        });
+                    }
+
+                    // Draw particles
+                    this.jetpackParticles.forEach(particle => {
+                        const gradient = ctx.createRadialGradient(
+                            particle.x, particle.y, 0,
+                            particle.x, particle.y, particle.size
+                        );
+                        gradient.addColorStop(0, this.jetpackColor1);
+                        gradient.addColorStop(1, this.jetpackColor2);
+                        
+                        ctx.globalAlpha = particle.life;
+                        ctx.fillStyle = gradient;
+                        ctx.beginPath();
+                        ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+                    
+                    ctx.restore();
+                }
+
+                // Draw the player sprite (existing code)
+                let sourceX = 0;
+                let sourceY = 0;
+                if (this.facingDirection === 1) {
+                    sourceY = 2 * this.spriteHeight;
+                } else {
+                    sourceY = 1 * this.spriteHeight;
+                }
+                if (this.isMovingHorizontally && this.onGround) {
+                    const currentAnimFrameIndex = Math.floor(this.walkFrame) % this.walkCycle.length;
+                    sourceX = this.walkCycle[currentAnimFrameIndex] * this.spriteWidth;
+                }
+                const cropOffset = 2;
+                const adjustedSpriteWidth = this.spriteWidth - (cropOffset * 2);
+                const adjustedSpriteHeight = this.spriteHeight - (cropOffset * 2);
+                ctx.drawImage(
+                    this.spriteSheet,
+                    sourceX + cropOffset,
+                    sourceY + cropOffset,
+                    adjustedSpriteWidth,
+                    adjustedSpriteHeight,
+                    this.x,
+                    this.y,
+                    this.width,
+                    this.height
+                );
+            },
+            update: function() {
+                this.isMovingHorizontally = false; 
+                if (keys.ArrowLeft || keys.ArrowRight) {
+                    this.isMovingHorizontally = true;
+                }
+
+                // If attached to UFO (e.g., during intro or abduction)
+                if (this.isAttachedToUFO) {
+                    this.x = ufo.x + ufo.width / 2 - this.width / 2;
+                    this.y = ufo.y + ufo.height - 5; 
+                    this.velocityY = 0; 
+                    this.onGround = false;
+                    this.isMovingHorizontally = false; 
+                    return; 
+                }
+
+                // Apply gravity
+                if (!this.onGround) { this.velocityY += this.gravity; }
+                this.y += this.velocityY;
+
+                const currentGroundHeight = getGroundHeightAt(this.x + this.width / 2);
+
+                // Check for landing on terrain
+                if (this.y + this.height >= currentGroundHeight) {
+                    this.y = currentGroundHeight - this.height;
+                    this.velocityY = 0;
+                    
+                    // Transition from INTRO to PLAYING state after initial drop
+                    if (!this.onGround && currentGameState === GAME_STATE.INTRO) { 
+                        currentGameState = GAME_STATE.PLAYING;
+                        ufo.flyAwayAfterDrop = true; 
+                    }
+
+                    // Reset jetpack uses upon landing
+                    if (!this.onGround) { 
+                        this.currentJetpackUses = 0; 
+                    }
+
+                    this.isJumping = false;
+                    this.onGround = true;
+                } else { 
+                    this.onGround = false; 
+                }
+
+                // Update walk animation frame
+                if (this.onGround && this.isMovingHorizontally) {
+                    this.walkFrame = (this.walkFrame + this.walkAnimationSpeed * gameSpeedFactor) % this.walkCycle.length;
+                } else if (!this.isMovingHorizontally || !this.onGround) {
+                    this.walkFrame = 0; // Reset to idle frame
+                }
+
+                // Check for falling out of bounds
+                if (this.y + this.height > canvas.height + player.height * 2) {
+                    if (currentGameState !== GAME_STATE.GAME_OVER && currentGameState !== GAME_STATE.PLAYER_DIED) {
+                        handlePlayerDeath("Fell into the abyss!");
+                    }
+                }
+
+                // Update jetpack state
+                if (!this.onGround && keys.Space && this.currentJetpackUses > 0) {
+                    this.jetpackActive = true;
+                } else {
+                    this.jetpackActive = false;
+                }
+
+                // Update jetpack fuel
+                if (this.jetpackActive && !this.isAttachedToUFO) {
+                    this.jetpackFuel = Math.max(0, this.jetpackFuel - this.jetpackFuelDrain * gameSpeedFactor);
+                    if (this.jetpackFuel <= 0) {
+                        this.jetpackActive = false;
+                    }
+                } else if (this.onGround) {
+                    this.jetpackFuel = Math.min(this.jetpackFuelMax, this.jetpackFuel + this.jetpackFuelRecharge);
+                }
+            },
+            jump: function() {
+                const currentTime = Date.now();
+                const canInitialJump = this.onGround && !this.isJumping && currentGameState === GAME_STATE.PLAYING;
+                const canJetpackBoost = !this.onGround && this.isJumping && 
+                                      this.currentJetpackUses < this.maxJetpackUses && 
+                                      (currentTime - this.lastJumpPressTime < this.jetpackWindow) && 
+                                      currentGameState === GAME_STATE.PLAYING &&
+                                      this.jetpackFuel > 0;
+
+                if (canInitialJump) {
+                    this.velocityY = -this.jumpForce;
+                    this.isJumping = true;
+                    this.onGround = false;
+                    this.currentJetpackUses = 0;
+                    this.jetpackActive = false;
+                } else if (canJetpackBoost) {
+                    this.velocityY = -this.jetpackForce * 0.8; // Reduced initial boost for smoother flight
+                    this.currentJetpackUses++;
+                    this.jetpackActive = true;
+                    this.jetpackParticles = [];
+                }
+
+                // If jetpack is active and has fuel, provide continuous lift
+                if (this.jetpackActive && this.jetpackFuel > 0) {
+                    this.velocityY = Math.max(this.velocityY - 0.5, -this.jetpackForce * 0.6); // Continuous but limited upward force
+                }
+            },
+            shoot: function(direction = {dx: 1, dy: 0}) { 
+                if (currentGameState !== GAME_STATE.PLAYING) return;
+                const currentTime = Date.now();
+                if (this.canShoot && (currentTime - this.lastShotTime > this.shootCooldown)) {
+                    let projectileX, projectileY, pWidth, pHeight, pSpeed, pColor;
+
+                    let isHorizontalShot = (direction.dx !== 0 && direction.dy === 0);
+
+                    if (isHorizontalShot) {
+                        pWidth = 35; pHeight = 6;  pSpeed = 15; pColor = '#FFD700'; // Gold
+                        if (this.facingDirection === 1) { // Facing right
+                            projectileX = this.x + this.width; 
+                            projectileY = this.y + this.height / 3; 
+                        } else { // Facing left
+                            projectileX = this.x - pWidth; 
+                            projectileY = this.y + this.height / 3; 
+                        }
+                        direction.dx = this.facingDirection; // Shoot in player's facing direction
+                    } else { // Vertical shot (up)
+                        pWidth = 4; pHeight = 10; pSpeed = 7; pColor = '#FFFF88'; // Yellow
+                        projectileX = this.x + this.width / 2 - pWidth / 2;
+                        projectileY = this.y - pHeight;
+                    }
+
+                    projectiles.push(new Projectile(projectileX, projectileY, direction, pWidth, pHeight, pSpeed, pColor));
+                    this.lastShotTime = currentTime;
+
+                    // Play laser sound
+                    laserSound.currentTime = 0;
+                    laserSound.play().catch(error => console.log("Laser sound failed:", error));
+                }
+            }
+        };
+
+        // --- Projectiles (Player) ---
+        const projectiles = [];
+        function Projectile(x, y, direction, width_ = 10, height_ = 4, baseSpeed_ = 7, color_ = '#FFFF88') {
+            this.x = x; this.y = y;
+            this.width = width_; this.height = height_;
+            this.color = color_;
+            this.baseSpeed = baseSpeed_;
+            this.direction = direction; 
+            this.draw = function() { ctx.fillStyle = this.color; ctx.fillRect(this.x, this.y, this.width, this.height); };
+            this.update = function() {
+                const currentSpeed = this.baseSpeed * gameSpeedFactor;
+                this.x += currentSpeed * this.direction.dx; this.y += currentSpeed * this.direction.dy;
+            };
+        }
+
+        // --- UFO Projectiles ---
+        const ufoProjectiles = [];
+        function UFOProjectile(x, y, targetX, targetY) {
+            this.x = x; this.y = y;
+            this.width = 6; this.height = 6;
+            this.color = '#FF6347'; // Tomato red
+            this.speed = 3.5 + currentLevel * 0.1;
+            const angle = Math.atan2(targetY - y, targetX - x);
+            this.dx = Math.cos(angle) * this.speed; // Store normalized direction * speed
+            this.dy = Math.sin(angle) * this.speed;
+            this.draw = function() { 
+                ctx.fillStyle = this.color; 
+                ctx.beginPath();
+                ctx.arc(this.x + this.width/2, this.y + this.height/2, this.width/2, 0, Math.PI*2);
+                ctx.fill();
+            };
+            this.update = function() { 
+                // Speed is already incorporated into dx/dy, so just apply gameSpeedFactor
+                this.x += this.dx * gameSpeedFactor; 
+                this.y += this.dy * gameSpeedFactor;
+            };
+        }
+
+        // --- UFO Object ---
+        const ufo = {
+            x: -100, y: 50, width: 120, height: 60, color: '#3399ff', speed: 1.5, 
+            beamColor: 'rgba(255, 50, 50, 0.3)', // Changed to red
+            beamWarningColor: 'rgba(255, 100, 100, 0.2)', // Changed to light red
+            isBeaming: false, isWarning: false, beamWidth: 20, beamHeight: 0,
+            abductionTarget: null, timeToAppearMin: 5000, timeToAppearMax: 10000,
+            nextAppearanceTime: 0, lastAppearance: Date.now(), health: 3,
+            warningDuration: 1500, beamStartTime: 0,
+            introTargetX: 100, introTargetY: 80, isMovingToIntroPos: false, flyAwayAfterDrop: false,
+            currentMovingDirection: 1, // 1 for right, -1 for left
+            canShoot: true, shootCooldown: 2000 - currentLevel * 50, lastShotTime: 0, 
+            portalTime: 0,
+            portalRadius: 15,
+            portalColor1: 'rgba(180, 80, 255, 0.7)',
+            portalColor2: 'rgba(100, 200, 255, 0.4)',
+            
+            draw: function() {
+                // Blue pulsing effect
+                const pulse = 0.8 + 0.2 * Math.sin(Date.now() / 350);
+                
+                // Draw portals during intro
+                if (currentGameState === GAME_STATE.INTRO && player.isAttachedToUFO) {
+                    this.portalTime += 0.05;
+                    
+                    // Draw left portal
+                    ctx.save();
+                    const leftPortalX = this.x + this.width * 0.2;
+                    const leftPortalY = this.y + this.height * 0.6;
+                    
+                    // Portal glow
+                    const portalGrad = ctx.createRadialGradient(
+                        leftPortalX, leftPortalY, 0,
+                        leftPortalX, leftPortalY, this.portalRadius * 1.5
+                    );
+                    portalGrad.addColorStop(0, 'rgba(180, 80, 255, 0.4)');
+                    portalGrad.addColorStop(1, 'rgba(180, 80, 255, 0)');
+                    ctx.fillStyle = portalGrad; ctx.beginPath();
+                    ctx.arc(leftPortalX, leftPortalY, this.portalRadius * 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Swirling effect
+                    ctx.strokeStyle = this.portalColor1;
+                    ctx.lineWidth = 2;
+                    for (let i = 0; i < 3; i++) {
+                        ctx.beginPath();
+                        for (let angle = 0; angle < Math.PI * 2; angle += 0.1) {
+                            const radius = this.portalRadius * (0.8 + Math.sin(angle * 3 + this.portalTime + i) * 0.2);
+                            const x = leftPortalX + Math.cos(angle + this.portalTime) * radius;
+                            const y = leftPortalY + Math.sin(angle + this.portalTime) * radius;
+                            if (angle === 0) ctx.moveTo(x, y);
+                            else ctx.lineTo(x, y);
+                        }
+                        ctx.closePath();
+                        ctx.stroke();
+                    }
+                    
+                    // Draw right portal
+                    const rightPortalX = this.x + this.width * 0.8;
+                    const rightPortalY = this.y + this.height * 0.6;
+                    
+                    // Right portal glow
+                    const rightPortalGrad = ctx.createRadialGradient(
+                        rightPortalX, rightPortalY, 0,
+                        rightPortalX, rightPortalY, this.portalRadius * 1.5
+                    );
+                    rightPortalGrad.addColorStop(0, 'rgba(100, 200, 255, 0.4)');
+                    rightPortalGrad.addColorStop(1, 'rgba(100, 200, 255, 0)');
+                    ctx.fillStyle = rightPortalGrad;
+                    ctx.beginPath();
+                    ctx.arc(rightPortalX, rightPortalY, this.portalRadius * 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Right portal swirling effect
+                    ctx.strokeStyle = this.portalColor2;
+                    for (let i = 0; i < 3; i++) {
+                        ctx.beginPath();
+                        for (let angle = 0; angle < Math.PI * 2; angle += 0.1) {
+                            const radius = this.portalRadius * (0.8 + Math.sin(angle * 3 - this.portalTime + i) * 0.2);
+                            const x = rightPortalX + Math.cos(angle - this.portalTime) * radius;
+                            const y = rightPortalY + Math.sin(angle - this.portalTime) * radius;
+                            if (angle === 0) ctx.moveTo(x, y);
+                            else ctx.lineTo(x, y);
+                        }
+                        ctx.closePath();
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                }
+
+                // Outer glow
+                ctx.save();
+                ctx.globalAlpha = 0.5 * pulse;
+                ctx.beginPath();
+                ctx.ellipse(this.x + this.width / 2, this.y + this.height / 2, (this.width / 2) * 1.25 * pulse, (this.height / 2) * 1.25 * pulse, 0, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(80,180,255,0.5)';
+                ctx.shadowColor = '#66ccff';
+                ctx.shadowBlur = 25 * pulse;
+                ctx.fill();
+                ctx.restore();
+                // UFO Body
+                ctx.save();
+                ctx.fillStyle = `rgb(${Math.floor(51 * pulse)},${Math.floor(153 * pulse)},${Math.floor(255 * pulse)})`;
+                ctx.beginPath();
+                ctx.ellipse(this.x + this.width / 2, this.y + this.height / 2, (this.width / 2) * pulse, (this.height / 2) * pulse, 0, 0, Math.PI * 2);
+                ctx.shadowColor = '#66ccff';
+                ctx.shadowBlur = 10 * pulse;
+                ctx.fill();
+                ctx.restore();
+                // UFO Cockpit
+                ctx.save();
+                ctx.fillStyle = `rgba(180,220,255,${0.7 * pulse})`;
+                ctx.beginPath();
+                ctx.ellipse(this.x + this.width / 2, this.y + this.height / 2 - 5 * pulse, this.width / 3 * pulse, this.height / 3 * pulse, 0, 0, Math.PI * 2);
+                ctx.shadowColor = '#b0e0ff';
+                ctx.shadowBlur = 8 * pulse;
+                ctx.fill();
+                ctx.restore();
+
+                // Draw intro beam when dropping player
+                if (currentGameState === GAME_STATE.INTRO && player.isAttachedToUFO) {
+                    const beamWidth = 40;
+                    const beamHeight = canvasHeight - this.y - this.height;
+                    // Outer beam glow
+                    ctx.save();
+                    const beamGradient = ctx.createLinearGradient(
+                        this.x + this.width/2, this.y + this.height,
+                        this.x + this.width/2, this.y + this.height + beamHeight
+                    );
+                    beamGradient.addColorStop(0, 'rgba(100, 200, 255, 0.4)');
+                    beamGradient.addColorStop(1, 'rgba(100, 200, 255, 0)');
+                    ctx.fillStyle = beamGradient;
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + this.width/2 - beamWidth, this.y + this.height);
+                    ctx.lineTo(this.x + this.width/2 + beamWidth, this.y + this.height);
+                    ctx.lineTo(this.x + this.width/2 + beamWidth * 1.5, this.y + this.height + beamHeight);
+                    ctx.lineTo(this.x + this.width/2 - beamWidth * 1.5, this.y + this.height + beamHeight);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    // Inner beam
+                    const innerBeamGradient = ctx.createLinearGradient(
+                        this.x + this.width/2, this.y + this.height,
+                        this.x + this.width/2, this.y + this.height + beamHeight/2
+                    );
+                    innerBeamGradient.addColorStop(0, 'rgba(180, 230, 255, 0.3)');
+                    innerBeamGradient.addColorStop(1, 'rgba(180, 230, 255, 0)');
+                    ctx.fillStyle = innerBeamGradient;
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + this.width/2 - beamWidth/2, this.y + this.height);
+                    ctx.lineTo(this.x + this.width/2 + beamWidth/2, this.y + this.height);
+                    ctx.lineTo(this.x + this.width/2 + beamWidth, this.y + this.height + beamHeight/2);
+                    ctx.lineTo(this.x + this.width/2 - beamWidth, this.y + this.height + beamHeight/2);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                // Regular abduction beam (only in PLAYING state)
+                if (currentGameState === GAME_STATE.PLAYING) {
+                    if (this.isWarning && !this.isBeaming) {
+                        ctx.fillStyle = this.beamWarningColor;
+                        ctx.fillRect(this.x + (this.width / 2) - (this.beamWidth / 2), this.y + this.height, this.beamWidth, canvasHeight - (this.y + this.height));
+                    }
+                    if (this.isBeaming) {
+                        ctx.fillStyle = this.beamColor;
+                        ctx.beginPath();
+                        ctx.moveTo(this.x + this.width/2 - this.beamWidth/2, this.y + this.height);
+                        ctx.lineTo(this.x + this.width/2 + this.beamWidth/2, this.y + this.height);
+                        ctx.lineTo(this.x + this.width/2 + this.beamWidth, canvasHeight);
+                        ctx.lineTo(this.x + this.width/2 - this.beamWidth, canvasHeight);
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                }
+            },
+            update: function() {
+                let ufoCurrentBaseSpeed = (this.speed + currentLevel * 0.05);
+                const ufoActualSpeed = ufoCurrentBaseSpeed * gameSpeedFactor;
+                const currentTime = Date.now();
+
+                // State 1: Fly away after dropping player
+                if (this.flyAwayAfterDrop) {
+                    this.y -= ufoActualSpeed * 8.0; 
+                    this.x += ufoActualSpeed * 5.0; 
+                    if (this.y < -this.height * 2 || this.x > camera.x + canvasWidth * 2 || this.x < camera.x - canvasWidth * 2) {
+                        this.flyAwayAfterDrop = false; 
+                        this.reset(false); // Reset for next appearance
+                    }
+                    this.isBeaming = false; this.isWarning = false;
+                    return; 
+                }
+
+                // State 2: Intro drop sequence
+                if (currentGameState === GAME_STATE.INTRO) {
+                    if (this.isMovingToIntroPos) {
+                        const dx = this.introTargetX - (this.x + this.width / 2);
+                        const dy = this.introTargetY - this.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+
+                        if (dist > ufoActualSpeed * 2) { 
+                            this.x += (dx / dist) * ufoActualSpeed * 2; 
+                            this.y += (dy / dist) * ufoActualSpeed * 2;
+                        } else { 
+                            this.x = this.introTargetX - this.width / 2;
+                            this.y = this.introTargetY;
+                            this.isMovingToIntroPos = false; 
+                            player.isAttachedToUFO = false; // Player is dropped
+                        }
+                    }
+                    return; 
+                }
+
+                // State 3: Normal enemy behavior (PLAYING state)
+                if (currentGameState === GAME_STATE.PLAYING) {
+                    if (this.health <= 0) { // UFO destroyed
+                        this.reset(true); // true = destroyed
+                        return; 
+                    }
+
+                    const isFullyOffScreen = (this.x - camera.x < -this.width * 2) || (this.x - camera.x > canvasWidth + this.width * 2);
+                    if (isFullyOffScreen && currentTime < this.nextAppearanceTime) {
+                        return; // Stay off-screen until time to reappear
+                    }
+
+                    // Horizontal movement
+                    this.x += ufoActualSpeed * this.currentMovingDirection;
+
+                    // Reverse direction at screen edges (relative to camera)
+                    if (this.currentMovingDirection === -1 && this.x < camera.x + 20) { 
+                        this.currentMovingDirection = 1;
+                    } else if (this.currentMovingDirection === 1 && this.x + this.width > camera.x + canvasWidth - 20) { 
+                        this.currentMovingDirection = -1;
+                    }
+
+                    // UFO Shooting Logic
+                    if (this.canShoot && !this.isBeaming && !this.isWarning &&
+                        currentTime - this.lastShotTime > Math.max(500, this.shootCooldown - currentLevel * 75) &&
+                        player.x + player.width > camera.x && player.x < camera.x + canvasWidth) { // Only shoot if player is on screen
+                        
+                        const Px = player.x + player.width / 2; // Target player center
+                        const Py = player.y + player.height / 2;
+                        ufoProjectiles.push(new UFOProjectile(this.x + this.width / 2, this.y + this.height / 2, Px, Py));
+                        this.lastShotTime = currentTime;
+                        this.shootCooldown = (1800 - currentLevel * 50) + (Math.random() * 500 - 250); // Randomize cooldown
+                    }
+
+                    // Abduction Beam Logic
+                    if (!this.isWarning && !this.isBeaming &&
+                        Math.abs(this.x + this.width / 2 - (player.x + player.width / 2)) < this.width * 1.8 && // Player horizontally close
+                        player.y < canvasHeight - 50) { // Player not too low
+                        if (Math.random() < (0.018 + currentLevel * 0.0025) * gameSpeedFactor) { // Chance to start warning
+                            this.isWarning = true;
+                            this.beamStartTime = currentTime;
+                        }
+                    }
+
+                    // Transition from warning to beaming
+                    if (this.isWarning && currentTime - this.beamStartTime > this.warningDuration) {
+                        this.isWarning = false;
+                        this.isBeaming = true;
+                        this.abductionTarget = player;
+                        this.beamHeight = 0; 
+                    }
+
+                    // Handle player abduction
+                    if (this.isBeaming && this.abductionTarget) {
+                        this.beamHeight = canvasHeight - (this.y + this.height);
+                        const beamWorldX = this.x + (this.width / 2) - (this.beamWidth / 2);
+                        const beamRect = { x: beamWorldX, y: this.y + this.height, width: this.beamWidth, height: this.beamHeight };
+
+                        if (checkCollision(this.abductionTarget, beamRect)) {
+                            const isResisting = keys.ArrowLeft || keys.ArrowRight || keys.Space;
+                            
+                            // Calculate pull direction towards beam center
+                            const targetX = this.x + this.width/2 - this.abductionTarget.width/2;
+                            const dx = targetX - this.abductionTarget.x;
+                            const pullStrength = isResisting ? 0.3 : 2.5;
+                            
+                            // Apply horizontal pull
+                            this.abductionTarget.x += dx * 0.1 * gameSpeedFactor;
+                            
+                            // Apply vertical pull
+                            if (!isResisting) {
+                                this.abductionTarget.y -= pullStrength * gameSpeedFactor * 10;
+                            } else {
+                                this.abductionTarget.y -= 0.3 * gameSpeedFactor * 10;
+                            }
+
+                            // Check if player is fully abducted
+                            if (this.abductionTarget.y + this.abductionTarget.height < this.y + this.height) {
+                                if (!isResisting && currentGameState !== GAME_STATE.GAME_OVER && currentGameState !== GAME_STATE.PLAYER_DIED) {
+                                    handlePlayerDeath("Abducted! (Try moving to escape next time!)");
+                                } else if (isResisting) {
+                                    this.abductionTarget.y = this.y + this.height;
+                                    this.abductionTarget.velocityY = 2;
+                                    this.isBeaming = false;
+                                }
+                            }
+                        }
+                    } else if (this.isBeaming && !this.abductionTarget) {
+                        this.isBeaming = false; // Stop beaming if target lost
+                    }
+                }
+            },
+            hit: function() { // Called when UFO is hit by player projectile
+                this.health--;
+                // Add visual/audio feedback for hit if desired
+                if (this.health <= 0) {
+                    // Explosion/destruction effect can be added here
+                    console.log("UFO Destroyed!");
+                }
+            },
+            reset: function(destroyed = false) {
+                const spawnLeft = Math.random() > 0.5;
+                const currentCamX = camera.x || 0; 
+                if (spawnLeft) {
+                    this.x = currentCamX - this.width - (50 + Math.random() * 100); 
+                } else {
+                    this.x = currentCamX + canvasWidth + (50 + Math.random() * 50); 
+                }
+                this.currentMovingDirection = spawnLeft ? 1 : -1; 
+                
+                this.health = 3 + Math.floor(currentLevel / 2); // Scale health with level
+                this.isBeaming = false; this.isWarning = false; this.beamHeight = 0;
+                this.isMovingToIntroPos = false;
+                this.lastShotTime = Date.now() + 1000; // Delay first shot
+                this.shootCooldown = Math.max(500, 2000 - currentLevel * 75); 
+
+                const baseAppearDelay = Math.max(1000, 3500 - currentLevel * 200); 
+                const randomAppearDelay = Math.random() * Math.max(1000, 2500 - currentLevel * 100);
+                this.nextAppearanceTime = Date.now() + baseAppearDelay + randomAppearDelay;
+
+                this.warningDuration = Math.max(300, 1500 - currentLevel * 100); // Warning gets shorter on higher levels
+                this.beamWidth = 25 + currentLevel * 3; // Beam gets wider
+                if (destroyed) { /* TODO: Add explosion particles or sound */ }
+            },
+            startIntroDrop: function() {
+                this.x = player.x + player.width/2 - this.width/2;
+                this.y = -this.height - 30;
+                this.isMovingToIntroPos = true;
+                this.flyAwayAfterDrop = false;
+                player.isAttachedToUFO = true;
+                this.introTargetX = player.x + player.width/2;
+                this.introTargetY = canvasHeight / 4;
+                this.portalTime = 0; // Reset portal animation time
+            }
+        };
+
+        // --- Terrain Generation ---
+        let terrain = [];
+        const terrainGoalPadding = 150; // Space after portal
+
+        // Modify terrain height constraints for mobile
+        function generateTerrainSegment(startX, endX, startY, roughness, displacement, isPlatform = false) { 
+            const points = [];
+            function subdivide(x1, y1, x2, y2, currentDisplacement) {
+                if (x2 - x1 < (isPlatform ? 5 : 15) ) {
+                    points.push({ x: x1, y: y1 });
+                    return;
+                }
+                const midX = (x1 + x2) / 2;
+                const midYOffset = isPlatform ? 0 : (Math.random() * 2 - 1) * currentDisplacement;
+                
+                // Much higher terrain on mobile to use less vertical space
+                let minY = IS_MOBILE ? canvasHeight * 0.65 : 50; // Raised from 0.3 to 0.65
+                let maxY = IS_MOBILE ? canvasHeight * 0.9 : canvasHeight - 10; // Raised from 0.85 to 0.9
+                
+                const midY = Math.min(maxY, Math.max(minY, (y1 + y2) / 2 + midYOffset));
+                
+                subdivide(x1, y1, midX, midY, currentDisplacement * roughness);
+                subdivide(midX, midY, x2, y2, currentDisplacement * roughness);
+            }
+            subdivide(startX, startY, endX, startY, displacement);
+            points.push({ x: endX, y: startY }); 
+            return points.sort((a, b) => a.x - b.x);
+        }
+
+        function generateRandomTerrain() {
+            terrain = [];
+            const minMainSegments = 5 + Math.floor(currentLevel / 3);
+            const maxMainSegments = 7 + Math.floor(currentLevel / 2);
+            const mainSegmentCount = Math.floor(Math.random() * (maxMainSegments - minMainSegments + 1)) + minMainSegments;
+            
+            const baseSegmentWidth = canvasWidth / (2.0 + Math.random() * 0.8);
+            let currentX = 0;
+            
+            // Much higher initial terrain height for mobile
+            let initialHeight = IS_MOBILE ? 
+                canvasHeight * 0.75 - (Math.random() * canvasHeight * 0.1) : // Raised from 0.7 to 0.75, less variation
+                canvasHeight - (Math.random() * canvasHeight / 5 + 80);
+            
+            let lastY = initialHeight;
+
+            // Start terrain before player's initial position
+            terrain.push({x: -canvasWidth, y: lastY}); 
+            terrain.push({x: player.x - player.width, y: lastY}); 
+            currentX = player.x - player.width;
+
+            const baseRoughness = Math.max(0.35, 0.65 - currentLevel * 0.02);
+            
+            // Much less vertical variation on mobile
+            let baseDisplacementFactor;
+            if (IS_MOBILE) {
+                baseDisplacementFactor = canvasHeight / Math.max(8, (12 - currentLevel * 0.35)); // Increased divisor for less variation
+            } else {
+                baseDisplacementFactor = canvasHeight / Math.max(2.5, (7 - currentLevel * 0.35));
+            }
+
+            for (let i = 0; i < mainSegmentCount; i++) {
+                const createGapChance = IS_MOBILE ? 
+                    (0.15 + currentLevel * 0.02) : // Slightly reduced gap chance on mobile
+                    (0.2 + currentLevel * 0.03);
+                    
+                if (i > 0 && Math.random() < createGapChance) {
+                    // Smaller gaps on mobile
+                    const maxGapWidth = IS_MOBILE ?
+                        player.jumpForce * player.speed * (1.4 + currentLevel * 0.15) :
+                        player.jumpForce * player.speed * (1.8 + currentLevel * 0.2);
+                    const minGapWidth = IS_MOBILE ?
+                        player.width * 2.5 + currentLevel * 4 :
+                        player.width * 3 + currentLevel * 5;
+                    
+                    const gapWidth = Math.random() * (maxGapWidth - minGapWidth) + minGapWidth;
+                    
+                    const gapStartX = currentX;
+                    currentX += gapWidth;
+
+                    // Fewer platforms in gaps on mobile
+                    const minPlatformsInGap = IS_MOBILE ? 
+                        Math.max(1, Math.floor(currentLevel / 4)) :
+                        1 + Math.floor(currentLevel / 3);
+                    const maxPlatformsInGap = IS_MOBILE ?
+                        Math.max(1, Math.floor(currentLevel / 3)) :
+                        2 + Math.floor(currentLevel / 2);
+                    
+                    const numPlatforms = Math.floor(Math.random() * (maxPlatformsInGap - minPlatformsInGap + 1)) + minPlatformsInGap;
+                    
+                    let platformX = gapStartX + gapWidth / (numPlatforms + 1) - (player.width * 1.5);
+
+                    for (let p = 0; p < numPlatforms; p++) {
+                        const platformMinLength = player.width * 1.5;
+                        const platformMaxLength = IS_MOBILE ?
+                            player.width * (2.2 - currentLevel * 0.08) : // Shorter platforms on mobile
+                            player.width * (3 - currentLevel * 0.1);
+                        const platformLength = Math.max(platformMinLength, Math.random() * (platformMaxLength - platformMinLength) + platformMinLength);
+                        
+                        // Higher platforms on mobile
+                        const platformYVariation = IS_MOBILE ?
+                            canvasHeight / (8 + Math.random() * 4) :
+                            canvasHeight / (6 + Math.random() * 3);
+                        
+                        const platformY = Math.min(canvasHeight - 30, Math.max(80, lastY + (Math.random() - 0.5) * platformYVariation * 2));
+                        
+                        const platformPoints = generateTerrainSegment(platformX, platformX + platformLength, platformY, 0.1, 5, true);
+                        terrain.push(...platformPoints);
+                        platformX += gapWidth / (numPlatforms + 1) + (Math.random() - 0.5) * 20;
+                    }
+                    lastY = Math.min(canvasHeight - 30, Math.max(80, lastY + (Math.random() - 0.7) * canvasHeight / 3));
+                }
+
+                // Generate main terrain segment
+                const segmentWidth = baseSegmentWidth * (0.7 + Math.random() * 0.5);
+                const nextY = IS_MOBILE ?
+                    canvasHeight * 0.75 - (Math.random() * canvasHeight * 0.1) :
+                    canvasHeight - (Math.random() * canvasHeight / (1.8 + Math.random()) + 60);
+                
+                const segmentPoints = generateTerrainSegment(
+                    currentX, currentX + segmentWidth, lastY,
+                    baseRoughness, baseDisplacementFactor * (0.7 + Math.random() * 0.5)
+                );
+                terrain.push(...segmentPoints.slice(terrain.length > 0 && terrain[terrain.length-1].x === currentX ? 1 : 0));
+                currentX = segmentPoints[segmentPoints.length - 1].x;
+                lastY = segmentPoints[segmentPoints.length - 1].y;
+            }
+            
+            terrain.sort((a,b) => a.x - b.x); // Final sort
+
+            // Filter out redundant points or points below existing terrain at the same X
+            terrain = terrain.filter((point, index, self) => 
+                index === self.findIndex(p => p.x === point.x) || self[self.findIndex(p => p.x === point.x)].y > point.y
+            );
+
+            // Place the portal
+            let portalPlaced = false;
+            for (let i = terrain.length - 2; i >= 0; i--) {
+                // Find a flat-ish segment for the portal near the end of generated terrain
+                if (terrain[i+1].x - terrain[i].x > portal.width * 1.5 && Math.abs(terrain[i+1].y - terrain[i].y) < portal.height / 2) {
+                    if (terrain[i].x > currentX - canvasWidth * 0.5) { // Ensure it's reasonably far
+                        portal.x = terrain[i].x + (terrain[i+1].x - terrain[i].x)/2 - portal.width/2;
+                        portal.y = Math.min(terrain[i].y, terrain[i+1].y) - portal.height;
+                        if (portal.y < 50) portal.y = 50; // Don't place portal too high
+                        portal.isActive = true;
+                        portalPlaced = true;
+                        break;
+                    }
+                }
+            }
+            if (!portalPlaced && terrain.length > 0) { // Fallback portal placement
+                portal.x = terrain[terrain.length - 1].x - portal.width - 50;
+                portal.y = getGroundHeightAt(portal.x + portal.width/2) - portal.height;
+                portal.isActive = true;
+            }
+
+            // Ensure terrain extends beyond the portal or end point
+            const finalXTPoint = portal.isActive ? portal.x : currentX; 
+            if (terrain.length === 0 || terrain[terrain.length - 1].x < finalXTPoint + terrainGoalPadding + 100) {
+                const lastKnownY = terrain.length > 0 ? terrain[terrain.length-1].y : canvasHeight - 80;
+                const lastKnownX = terrain.length > 0 ? terrain[terrain.length-1].x : finalXTPoint;
+                terrain.push({x: lastKnownX + terrainGoalPadding + 200, y: lastKnownY}); 
+            }
+
+            // Clear existing mines
+            spaceMines = [];
+            
+            // Add mines along the terrain
+            for (let i = 0; i < terrain.length - 1; i++) {
+                if (Math.random() < 0.1 && // 10% chance per terrain segment
+                    terrain[i+1].x - terrain[i].x > 50) { // Only on wider segments
+                    
+                    const mineX = terrain[i].x + Math.random() * (terrain[i+1].x - terrain[i].x - 30);
+                    const groundY = getGroundHeightAt(mineX);
+                    spaceMines.push(new SpaceMine(mineX, groundY - 20));
+                }
+            }
+            
+            placeEarthSigns();
+        }
+
+
+        function drawTerrain() { 
+            if (terrain.length === 0) return; 
+            // Draw terrain fill
+            for (let i = 0; i < terrain.length - 1; i++) {
+                const p1 = terrain[i]; const p2 = terrain[i+1];
+                // Culling: Skip if segment is off-screen
+                if (Math.max(p1.x,p2.x) < camera.x - 50 || Math.min(p1.x,p2.x) > camera.x + canvasWidth + 50) continue;
+
+                if (p2.x - p1.x < canvasWidth / 1.5) { // Avoid drawing huge fills for gaps (platforms are handled this way)
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+                    ctx.lineTo(p2.x, canvas.height + 50); // Extend below canvas
+                    ctx.lineTo(p1.x, canvas.height + 50);
+                    ctx.closePath();
+                    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+                    gradient.addColorStop(0, "#202030"); gradient.addColorStop(0.6, "#151525"); gradient.addColorStop(1, "#0a0a15"); 
+                    ctx.fillStyle = gradient; ctx.fill();
+                }
+            }
+            
+            // Draw terrain outline
+            ctx.strokeStyle = '#505070'; ctx.lineWidth = 2; 
+            for (let i = 0; i < terrain.length - 1; i++) {
+                const p1 = terrain[i]; const p2 = terrain[i+1];
+                if (Math.max(p1.x,p2.x) < camera.x - 50 || Math.min(p1.x,p2.x) > camera.x + canvasWidth + 50) continue;
+                if (p2.x - p1.x < canvasWidth / 1.5) { 
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+                    ctx.stroke();
+                }
+            }
+
+            // After drawing terrain, draw signs
+            earthSigns.forEach(sign => {
+                // Draw post
+                ctx.save();
+                ctx.strokeStyle = '#8b5a2b';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(sign.x, sign.y);
+                ctx.lineTo(sign.x, sign.y - 24);
+                ctx.stroke();
+                // Draw sign board
+                ctx.translate(sign.x, sign.y - 24);
+                ctx.rotate(sign.dir * -0.2);
+                ctx.fillStyle = '#deb887';
+                ctx.fillRect(-18, -10, 36, 20);
+                ctx.strokeStyle = '#8b5a2b';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(-18, -10, 36, 20);
+                // Draw text
+                ctx.fillStyle = '#222';
+                ctx.font = 'bold 13px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(sign.label, 0, 3);
+                // Draw arrow
+                ctx.beginPath();
+                ctx.moveTo(sign.dir * 12, 0);
+                ctx.lineTo(sign.dir * 18, -5);
+                ctx.lineTo(sign.dir * 18, 5);
+                ctx.closePath();
+                ctx.fillStyle = '#222';
+                ctx.fill();
+                ctx.restore();
+            });
+        }
+
+        // Update getGroundHeightAt to match new mobile constraints
+        function getGroundHeightAt(xPos) { 
+            let bestMatchY = canvas.height + player.height * 3;
+            let foundGround = false;
+
+            // Match the new height constraints
+            const minY = IS_MOBILE ? canvasHeight * 0.65 : 50;
+            const maxY = IS_MOBILE ? canvasHeight * 0.9 : canvas.height - 10;
+
+            for (let i = 0; i < terrain.length - 1; i++) {
+                const p1 = terrain[i];
+                const p2 = terrain[i + 1];
+                if (xPos >= p1.x && xPos <= p2.x) {
+                    const t = (p2.x - p1.x === 0) ? 0 : (xPos - p1.x) / (p2.x - p1.x);
+                    if (isNaN(t) || !isFinite(t)) continue;
+                    let segmentY = p1.y + t * (p2.y - p1.y);
+                    
+                    segmentY = Math.min(maxY, Math.max(minY, segmentY));
+                    
+                    if (segmentY < bestMatchY) {
+                        bestMatchY = segmentY;
+                        foundGround = true;
+                    }
+                }
+            }
+            return foundGround ? bestMatchY : canvas.height + player.height * 3;
+        }
+        
+        // --- Portal (Level Exit) ---
+        const portal = { 
+            x: 0, y: 0, width: 40, height: 60, isActive: false,
+            color1: 'rgba(180, 80, 255, 0.7)', color2: 'rgba(220, 150, 255, 0.2)',
+            pulseFactor: 0, time: 0,
+            draw: function() {
+                if (!this.isActive) return; this.time += 0.05;
+                const pulse = Math.sin(this.time) * 0.1 + 0.9; // Pulsating effect
+                ctx.save();
+                // Outer glow
+                const glowSize = this.width * 1.5 * pulse;
+                const glowGrad = ctx.createRadialGradient( this.x + this.width / 2, this.y + this.height / 2, 0, this.x + this.width / 2, this.y + this.height / 2, glowSize / 2 );
+                glowGrad.addColorStop(0, 'rgba(200, 150, 255, 0.5)'); glowGrad.addColorStop(1, 'rgba(200, 150, 255, 0)');
+                ctx.fillStyle = glowGrad; ctx.beginPath();
+                ctx.ellipse(this.x + this.width/2, this.y + this.height/2, glowSize/2, glowSize * (this.height/this.width) / 2, 0, 0, Math.PI*2);
+                ctx.fill();
+                // Inner portal
+                const grad = ctx.createRadialGradient( this.x + this.width / 2, this.y + this.height / 2, this.width * 0.05 * pulse, this.x + this.width / 2, this.y + this.height / 2, this.width * 0.4 * pulse );
+                grad.addColorStop(0, 'rgba(255,255,255,1)'); grad.addColorStop(0.3, this.color1); grad.addColorStop(1, this.color2);
+                ctx.fillStyle = grad; ctx.beginPath();
+                ctx.ellipse(this.x + this.width/2, this.y + this.height/2, this.width/2 * pulse, this.height/2 * pulse, 0, 0, Math.PI*2);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(230, 200, 255, 0.8)'; ctx.lineWidth = 2; ctx.stroke();
+                ctx.restore();
+            },
+            update: function() {
+                if (this.isActive && currentGameState === GAME_STATE.PLAYING && checkCollision(player, {x: this.x, y: this.y, width: this.width, height: this.height})) {
+                    nextLevel(); this.isActive = false; // Advance to next level
+                }
+            }
+        };
+
+
+        // --- Background Elements ---
+        const spaceBackground = {
+            starsFar: [], starsNear: [],
+            nebulaAlpha: 0.1, nebulaTargetAlpha: 0.3, nebulaColor: `rgba(100, 80, 150, 0.1)`,
+            // Add background image
+            bgImage: null,
+            bgLoaded: false,
+            init: function() {
+                this.starsFar = []; this.starsNear = [];
+                for (let i = 0; i < 80; i++) { this.starsFar.push({ x: Math.random() * canvasWidth, y: Math.random() * canvasHeight, size: Math.random() * 1.2 + 0.3, opacity: Math.random() * 0.4 + 0.2 }); }
+                for (let i = 0; i < 40; i++) { this.starsNear.push({ x: Math.random() * canvasWidth, y: Math.random() * canvasHeight, size: Math.random() * 1.8 + 0.8, opacity: Math.random() * 0.5 + 0.5 }); }
+                this.nebulaColor = `rgba(${Math.floor(Math.random()*50+60)}, ${Math.floor(Math.random()*50+40)}, ${Math.floor(Math.random()*50+100)}, ${this.nebulaAlpha})`;
+                this.nebulaTargetAlpha = Math.random() * 0.3 + 0.2;
+                // Load background image if not already
+                if (!this.bgImage) {
+                    this.bgImage = new Image();
+                    this.bgImage.src = 'blue.jpg';
+                    this.bgImage.onload = () => { this.bgLoaded = true; };
+                }
+            },
+            update: function(cameraDeltaX) {
+                this.starsFar.forEach(star => { star.x -= cameraDeltaX * 0.1; if (star.x < 0) star.x += canvasWidth; if (star.x > canvasWidth) star.x -= canvasWidth; });
+                this.starsNear.forEach(star => { star.x -= cameraDeltaX * 0.3; if (star.x < 0) star.x += canvasWidth; if (star.x > canvasWidth) star.x -= canvasWidth; });
+                if (this.nebulaAlpha < this.nebulaTargetAlpha) this.nebulaAlpha += 0.0005; else if (this.nebulaAlpha > this.nebulaTargetAlpha) this.nebulaAlpha -= 0.0005;
+                if (Math.abs(this.nebulaAlpha - this.nebulaTargetAlpha) < 0.01 && Math.random() < 0.005) { this.nebulaTargetAlpha = Math.random() * 0.3 + 0.1; this.nebulaColor = `rgba(${Math.floor(Math.random()*50+60)}, ${Math.floor(Math.random()*50+40)}, ${Math.floor(Math.random()*50+100)}, ${this.nebulaAlpha})`; }
+                this.nebulaColor = this.nebulaColor.replace(/[\d\.]+\)$/g, `${this.nebulaAlpha.toFixed(3)})`);
+            },
+            draw: function() {
+                // Draw background image if loaded
+                if (this.bgLoaded) {
+                    ctx.drawImage(this.bgImage, 0, 0, canvasWidth, canvasHeight);
+                } else {
+                    ctx.fillStyle = '#000010'; ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+                }
+                if (this.nebulaAlpha > 0.01) { ctx.fillStyle = this.nebulaColor; ctx.fillRect(0,0, canvasWidth, canvasHeight); }
+                this.starsFar.forEach(star => { ctx.fillStyle = `rgba(200, 200, 255, ${star.opacity})`; ctx.beginPath(); ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2); ctx.fill(); });
+                this.starsNear.forEach(star => { ctx.fillStyle = `rgba(255, 255, 255, ${star.opacity})`; ctx.beginPath(); ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2); ctx.fill(); });
+            }
+        };
+
+        // --- Camera ---
+        const camera = { 
+            x: 0, y: 0, prevX: 0, // Camera position (y is not used for scrolling in this game)
+            update: function() { 
+                this.prevX = this.x; 
+                let targetX = player.x - canvasWidth / 3.5; // Keep player around 1/3.5 from left of screen
+                this.x += (targetX - this.x) * 0.08; // Smooth camera follow
+                if (this.x < 0) this.x = 0; // Prevent camera from going left of world start
+            }
+        };
+
+        // --- Input Handling ---
+        const keys = { ArrowLeft: false, ArrowRight: false, Space: false, ControlLeft: false, ShiftLeft: false };
+        let lastTapTime = 0; const doubleTapThreshold = 300; // For mobile double-tap shoot
+
+        function handleKeyDown(e) {
+            if (currentGameState === GAME_STATE.GAME_OVER) return; 
+            if (e.code === "ArrowLeft" || e.code === "KeyA") keys.ArrowLeft = true;
+            if (e.code === "ArrowRight" || e.code === "KeyD") keys.ArrowRight = true;
+            
+            if (e.code === "Space" || e.code === "KeyW" || e.code === "ArrowUp") {
+                if (!keys.Space) { // Only on initial press for jump/jetpack timing
+                    player.lastJumpPressTime = Date.now();
+                }
+                keys.Space = true; 
+            }
+
+            if (e.code === "ControlLeft" || e.key === "f") keys.ControlLeft = true; // Shoot key
+            if (e.code === "ShiftLeft" || e.code === "KeyS") keys.ShiftLeft = true; // Modifier for vertical shoot
+        }
+
+        function handleKeyUp(e) {
+            if (e.code === "ArrowLeft" || e.code === "KeyA") keys.ArrowLeft = false;
+            if (e.code === "ArrowRight" || e.code === "KeyD") keys.ArrowRight = false;
+            if (e.code === "Space" || e.code === "KeyW" || e.code === "ArrowUp") keys.Space = false;
+            if (e.code === "ControlLeft" || e.key === "f") keys.ControlLeft = false;
+            if (e.code === "ShiftLeft" || e.code === "KeyS") keys.ShiftLeft = false;
+        }
+
+        function handleCanvasTap(e) { // For mobile double-tap to shoot upwards
+            e.preventDefault(); 
+            if (currentGameState === GAME_STATE.GAME_OVER || currentGameState === GAME_STATE.INTRO) return;
+            
+            const currentTime = Date.now();
+            if (currentTime - lastTapTime < doubleTapThreshold) {
+                player.shoot({dx: 0, dy: -1}); // Double-tap shoots up
+                lastTapTime = 0; 
+            } else {
+                lastTapTime = currentTime; 
+            }
+        }
+
+        // Setup touch controls if on a mobile device
+        if (IS_MOBILE) {
+            document.getElementById('touch-controls').style.display = 'block';
+
+            document.getElementById('touch-left').addEventListener('touchstart', (e) => { e.preventDefault(); if(currentGameState !== GAME_STATE.GAME_OVER) keys.ArrowLeft = true; });
+            document.getElementById('touch-left').addEventListener('touchend', (e) => { e.preventDefault(); keys.ArrowLeft = false; });
+            
+            document.getElementById('touch-right').addEventListener('touchstart', (e) => { e.preventDefault(); if(currentGameState !== GAME_STATE.GAME_OVER) keys.ArrowRight = true; });
+            document.getElementById('touch-right').addEventListener('touchend', (e) => { e.preventDefault(); keys.ArrowRight = false; });
+            
+            document.getElementById('touch-jump').addEventListener('touchstart', (e) => { e.preventDefault(); if(currentGameState !== GAME_STATE.GAME_OVER) { player.lastJumpPressTime = Date.now(); keys.Space = true; } });
+            document.getElementById('touch-jump').addEventListener('touchend', (e) => { e.preventDefault(); keys.Space = false;}); 
+            
+            document.getElementById('touch-shoot-horizontal').addEventListener('touchstart', (e) => { e.preventDefault(); if(currentGameState !== GAME_STATE.GAME_OVER) player.shoot({dx: 1, dy: 0}); }); 
+            
+            canvas.addEventListener('touchstart', handleCanvasTap, { passive: false }); // For double-tap shoot up
+        }
+        
+        // --- Collision Detection ---
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+
+        // --- Game Logic & Loop ---
+        let animationFrameId;
+        function updateGame() { 
+            if (currentGameState === GAME_STATE.GAME_OVER) return; 
+            gameSpeedFactor = 1 + (currentLevel -1) * 0.05; // Game speeds up with levels
+            
+            player.isMovingHorizontally = false;
+
+            if (currentGameState === GAME_STATE.PLAYING) { // Handle player input only during active play
+                if (keys.ArrowLeft && player.x > camera.x + 5) { 
+                    player.x -= player.speed * gameSpeedFactor; 
+                    player.isMovingHorizontally = true; player.facingDirection = -1; 
+                }
+                if (keys.ArrowRight && terrain.length > 0 && player.x < terrain[terrain.length - 1].x - player.width - 10) { // Don't go past end of terrain
+                    player.x += player.speed * gameSpeedFactor;
+                    player.isMovingHorizontally = true; player.facingDirection = 1;
+                }
+                if (keys.Space) player.jump(); 
+                if (keys.ControlLeft) { 
+                    if (keys.ShiftLeft) { player.shoot({dx: 0, dy: -1}); } // Shift + Ctrl = Shoot Up
+                    else { player.shoot({dx: 1, dy: 0}); } // Ctrl = Shoot Horizontal
+                }
+            }
+            
+            player.update();
+            ufo.update(); 
+            
+            projectiles.forEach((p, index) => { 
+                p.update(); 
+                if (p.x > camera.x + canvasWidth + 50 || p.x < camera.x - 50 || p.y < -50 || p.y > canvasHeight + 50) { 
+                    projectiles.splice(index, 1); // Remove off-screen projectiles
+                } else if (ufo.health > 0 && checkCollision(p, {x: ufo.x, y: ufo.y, width: ufo.width, height: ufo.height})) { 
+                    projectiles.splice(index, 1); 
+                    ufo.hit(); 
+                } else { // Check collision with Monster Crafts
+                    for (let mcIndex = monsterCrafts.length -1; mcIndex >= 0; mcIndex--) {
+                        const mc = monsterCrafts[mcIndex];
+                        if (mc.alive && checkCollision(p, mc)) {
+                            projectiles.splice(index, 1); 
+                            mc.alive = false; // Destroy monster craft
+                            return; 
+                        }
+                    }
+                }
+            });
+            
+            ufoProjectiles.forEach((up, index) => {
+                up.update();
+                if (up.x + up.width < camera.x - 20 || up.x > camera.x + canvasWidth + 20 || up.y + up.height < -20 || up.y > canvasHeight + 20) {
+                    ufoProjectiles.splice(index, 1); // Remove off-screen UFO projectiles
+                } else if (checkCollision(player, up)) { // UFO projectile hits player
+                    if (currentGameState !== GAME_STATE.GAME_OVER && currentGameState !== GAME_STATE.PLAYER_DIED) {
+                        handlePlayerDeath("Shot by UFO!");
+                    }
+                    ufoProjectiles.splice(index, 1); 
+                }
+            });
+
+            // MonsterCraft projectiles update
+            monsterProjectiles.forEach((mp, index) => {
+                mp.update();
+                if (
+                    mp.x + mp.width < camera.x - 20 ||
+                    mp.x > camera.x + canvasWidth + 20 ||
+                    mp.y + mp.height < -20 ||
+                    mp.y > canvasHeight + 20
+                ) {
+                    monsterProjectiles.splice(index, 1); // Remove off-screen
+                } else if (checkCollision(player, mp)) {
+                    if (currentGameState !== GAME_STATE.GAME_OVER && currentGameState !== GAME_STATE.PLAYER_DIED) {
+                        handlePlayerDeath("Shot by monster craft!");
+                    }
+                    monsterProjectiles.splice(index, 1);
+                }
+            });
+
+            monsterCrafts = monsterCrafts.filter(mc => { mc.update(); return mc.alive; }); // Update and filter dead monster crafts
+            
+            if (currentGameState === GAME_STATE.PLAYING) {
+                portal.update(); 
+            }
+            
+            camera.update(); 
+            const cameraDeltaX = camera.x - camera.prevX; 
+            spaceBackground.update(cameraDeltaX); // Update background parallax
+            
+            // Check mine collisions
+            spaceMines.forEach(mine => {
+                if (mine.active && !mine.isExploding && checkCollision(player, mine)) {
+                    mine.explode();
+                    if (currentGameState !== GAME_STATE.GAME_OVER && currentGameState !== GAME_STATE.PLAYER_DIED) {
+                        handlePlayerDeath("Destroyed by space mine!");
+                    }
+                }
+            });
+            
+            // Update and draw mines
+            spaceMines = spaceMines.filter(mine => mine.active);
+        }
+
+        function drawGame() { 
+            if (currentGameState === GAME_STATE.GAME_OVER && messageBox.style.display === 'block') return;
+
+            spaceBackground.draw(); 
+            ctx.save(); 
+            ctx.translate(-camera.x, -camera.y); // Apply camera offset
+            
+            drawTerrain(); 
+            if (portal.isActive) { portal.draw(); } 
+
+            if (currentGameState === GAME_STATE.INTRO || currentGameState === GAME_STATE.PLAYING) { 
+                player.draw(); 
+            }
+            projectiles.forEach(p => p.draw()); 
+            ufoProjectiles.forEach(up => up.draw()); 
+            monsterProjectiles.forEach(mp => mp.draw()); 
+            
+            // Draw monster crafts before UFO
+            monsterCrafts.forEach(mc => {
+                if (mc.alive) {
+                    console.log(`Drawing monster craft at x=${mc.x}, y=${mc.y}`);
+                    mc.draw();
+                }
+            });
+            
+            ufo.draw(); 
+            
+            // Draw mines
+            spaceMines.forEach(mine => mine.draw());
+            
+            ctx.restore(); // Reset transform for UI elements not affected by camera
+        }
+
+        function gameLoop() {
+            if (currentGameState === GAME_STATE.GAME_OVER && messageBox.style.display === 'block') {
+                animationFrameId = requestAnimationFrame(gameLoop); // Keep loop running for potential restart but don't update/draw game
+                return;
+            }
+            updateGame(); 
+            drawGame(); 
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // --- UI Updates ---
+        function updateLevelDisplay() { levelDisplay.textContent = `Level: ${currentLevel}`; }
+        function updateLivesDisplay() { livesDisplay.textContent = `Lives: ${player.lives}`; }
+        
+        // --- Level & Game State Management ---
+        function resetPlayerStateForNewLevel() { 
+            player.x = 50; player.velocityY = 0; 
+            player.isJumping = false; player.onGround = false; 
+            player.isAttachedToUFO = true; // Start attached for intro drop
+            player.currentJetpackUses = 0; 
+        }
+        
+        function startNewLevelSequence() { // Called when advancing to a new level
+            currentGameState = GAME_STATE.INTRO; 
+            resetPlayerStateForNewLevel(); 
+            camera.x = 0; camera.prevX = 0; 
+            portal.isActive = false; 
+            ufo.reset(); 
+            ufo.startIntroDrop(); 
+            projectiles.length = 0; ufoProjectiles.length = 0; 
+            generateRandomTerrain(); 
+            spaceBackground.init(); 
+            spawnMonsterCrafts(); 
+            console.log(`Starting Level ${currentLevel}`);
+        }
+
+        function restartCurrentLevelSequence() { // Called when player loses a life (but not game over)
+            console.log(`Player died. Restarting level ${currentLevel}. Lives remaining: ${player.lives}`);
+            currentGameState = GAME_STATE.INTRO; 
+            resetPlayerStateForNewLevel(); 
+            camera.x = 0; camera.prevX = 0;
+            portal.isActive = false; 
+            ufo.reset(); 
+            ufo.startIntroDrop(); 
+            projectiles.length = 0; ufoProjectiles.length = 0;
+            generateRandomTerrain(); // Regenerate terrain for the current level
+            spaceBackground.init(); 
+            spawnMonsterCrafts(); // Respawn monsters
+        }
+
+        function handlePlayerDeath(reason) {
+            if (currentGameState === GAME_STATE.GAME_OVER || currentGameState === GAME_STATE.PLAYER_DIED) return;
+
+            console.log("Player lost a life! Reason:", reason);
+            player.lives--;
+            updateLivesDisplay();
+            currentGameState = GAME_STATE.PLAYER_DIED;
+
+            if (player.lives <= 0) {
+                gameOver(reason);
+            } else {
+                restartCurrentLevelSequence();
+            }
+        }
+        
+        function tempRestartHandler() { // Handles "Try Again" after losing a life
+            messageBox.style.display = 'none';
+            restartCurrentLevelSequence();
+            restartButton.removeEventListener('click', tempRestartHandler); // Remove this specific handler
+            restartButton.addEventListener('click', mainRestartHandler); // Re-attach main handler
+            restartButton.textContent = "Play Again"; 
+        }
+
+        function nextLevel() { 
+            currentLevel++; 
+            updateLevelDisplay(); 
+            startNewLevelSequence();
+        }
+
+        function gameOver(reason) {
+            if (currentGameState === GAME_STATE.GAME_OVER) return;
+            currentGameState = GAME_STATE.GAME_OVER;
+            console.log("Game Over:", reason); // Keep reason in console for debugging
+            messageBox.style.display = 'block';
+            bgMusic.pause(); // Pause music on game over
+        }
+
+        const mainRestartHandler = () => { // Handles "Play Again" after game over
+            messageBox.style.display = 'none';
+            currentLevel = 1; 
+            player.lives = 3; 
+            updateLevelDisplay();
+            updateLivesDisplay();
+            startNewLevelSequence(); 
+            bgMusic.currentTime = 0; // Reset music to beginning
+            bgMusic.play(); // Restart music
+        };
+        
+        restartButton.addEventListener('click', mainRestartHandler); // Initial attachment
+
+        function initGame() {
+            setCanvasDimensions();
+            
+            // Start background music
+            bgMusic.play().catch(error => {
+                console.log("Audio autoplay failed:", error);
+                // Add click-to-start listener if autoplay fails
+                document.addEventListener('click', () => {
+                    bgMusic.play();
+                }, { once: true });
+            });
+
+            window.addEventListener('resize', () => { 
+                setCanvasDimensions(); 
+                spaceBackground.init(); // Re-init background for new canvas size
+                // Terrain and game state might need more careful handling on resize
+                // For simplicity, current implementation regenerates terrain and resets some states.
+                // This could be improved to preserve level progress more accurately.
+                generateRandomTerrain(); 
+                if (currentGameState === GAME_STATE.INTRO) { 
+                    ufo.startIntroDrop(); 
+                } else if (currentGameState === GAME_STATE.PLAYING) { 
+                    // Attempt to reposition player on new ground, might be imperfect
+                    player.y = getGroundHeightAt(player.x + player.width/2) - player.height; 
+                } 
+                camera.x = 0; camera.prevX = 0; 
+            });
+            window.addEventListener('keydown', handleKeyDown);
+            window.addEventListener('keyup', handleKeyUp);
+            
+            astronautSprites.onload = () => {
+                console.log("Astronaut sprites loaded.");
+                spritesLoaded = true;
+                player.spriteSheet = astronautSprites;
+                
+                // Assuming spritesheet is 4x4 frames
+                actualSpriteWidth = astronautSprites.naturalWidth / 4; 
+                actualSpriteHeight = astronautSprites.naturalHeight / 4; 
+
+                player.spriteWidth = actualSpriteWidth;
+                player.spriteHeight = actualSpriteHeight;
+
+                updateLevelDisplay();
+                player.lives = 3; 
+                updateLivesDisplay(); 
+
+                if (animationFrameId) cancelAnimationFrame(animationFrameId); // Clear any existing loop
+                messageBox.style.display = 'none'; 
+                startNewLevelSequence(); 
+                gameLoop(); // Start game loop *after* sprites are loaded
+            };
+
+            astronautSprites.onerror = () => {
+                console.error("Failed to load astronaut_sprites.png. Ensure it's in the same directory.");
+                messageBox.style.display = 'block';
+                messageTitle.textContent = "Asset Error";
+                messageReason.textContent = "Could not load astronaut sprites. Game cannot start.";
+                messageFinalScore.textContent = "Please check the file is present.";
+                // Optionally, disable the restart button or change its text
+                restartButton.disabled = true;
+                restartButton.textContent = "Error";
+            };
+        }
+        
+        // --- Monster Craft (New Enemy Type) ---
+        let monsterCrafts = [];
+        let monsterProjectiles = [];
+        const getMonsterCraftCount = () => 1; // Only 1 monster craft
+
+        function spawnMonsterCrafts() {
+    monsterCrafts = [];
+    // Limit monster crafts on mobile
+    const maxCrafts = IS_MOBILE ? 
+        Math.min(2, 1 + Math.floor(currentLevel / 3)) : // Mobile: Max 2 crafts, scaling slower
+        2 + Math.floor(currentLevel / 2); // Desktop: Original scaling
+    
+    console.log(`Spawning ${maxCrafts} monster crafts for level ${currentLevel} on ${IS_MOBILE ? 'mobile' : 'desktop'}`);
+    
+    // Spawn crafts spread across the screen
+    for (let i = 0; i < maxCrafts; i++) {
+        const spawnLeft = i % 2 === 0; // Alternate sides
+        const x = spawnLeft ? 
+            camera.x + 100 + (i * 200) : // Left side with spacing
+            camera.x + canvasWidth - 300 + (i * 100); // Right side with spacing
+        
+        const groundY = getGroundHeightAt(x + 22);
+        const minAbove = IS_MOBILE ? 60 : 80; // Lower height on mobile
+        const maxAbove = IS_MOBILE ? 120 : 160;
+        let y = groundY - (minAbove + Math.random() * (maxAbove - minAbove));
+        y = Math.max(50, Math.min(y, canvasHeight - 100));
+        
+        const direction = spawnLeft ? 1 : -1;
+        monsterCrafts.push(new MonsterCraft(x, y, direction, i));
+        console.log(`Monster Craft ${i}: x=${x}, y=${y}, groundY=${groundY}, direction=${direction}`);
+    }
+}
+
+        function MonsterCraft(x, y, direction, spriteIndex) {
+            this.x = x; this.y = y;
+            this.width = 30;  // Reduced from 44
+            this.height = 15; // Reduced from 22
+            this.color = '#b0c4de';
+            this.domeColor = 'rgba(180,220,255,0.8)';
+            this.lightColor = '#00f6ff';
+            this.speed = 1.1 + Math.random() * 0.4 + currentLevel * 0.04;
+            this.alive = true;
+            this.direction = direction || 1;
+            this.shootCooldown = 3000 + Math.random() * 2000 - currentLevel * 50;
+            this.lastShotTime = Date.now() + Math.random() * 2000;
+            this.spriteIndex = spriteIndex || 0;
+            this.yDriftTimer = 0;
+            this.yDriftTarget = y;
+
+            this.update = function() {
+    if (!this.alive) return;
+    this.x += this.speed * this.direction * gameSpeedFactor;
+    this.yDriftTimer--;
+    if (this.yDriftTimer <= 0) {
+        const groundY = getGroundHeightAt(this.x + this.width/2);
+        const minAbove = 40, maxAbove = 120;
+        this.yDriftTarget = groundY - (minAbove + Math.random() * (maxAbove - minAbove));
+        this.yDriftTarget = Math.max(50, Math.min(this.yDriftTarget, canvasHeight - 50));
+        this.yDriftTimer = 60 + Math.floor(Math.random() * 120);
+    }
+    this.y += (this.yDriftTarget - this.y) * 0.05;
+    // Ensure craft stays above terrain at current X
+    const currentGroundY = getGroundHeightAt(this.x + this.width/2);
+    if (this.y + this.height > currentGroundY) {
+        this.y = currentGroundY - this.height;
+    }
+    if (this.x < camera.x + 50) {
+        this.x = camera.x + 50;
+        this.direction = 1;
+    } else if (this.x + this.width > camera.x + canvasWidth - 50) {
+        this.x = camera.x + canvasWidth - this.width - 50;
+        this.direction = -1;
+    }
+    const screenX = this.x - camera.x;
+    const screenY = this.y - camera.y;
+    console.log(`Monster Craft screen pos: x=${screenX}, y=${screenY}, world x=${this.x}, y=${this.y}, groundY=${currentGroundY}`);
+    const now = Date.now();
+    if (currentGameState === GAME_STATE.PLAYING && 
+        now - this.lastShotTime > this.shootCooldown && 
+        this.x > camera.x && this.x < camera.x + canvasWidth) {
+        let projDir = (player.x + player.width/2 > this.x + this.width/2) ? 1 : -1;
+        const projX = projDir === 1 ? this.x + this.width : this.x - 10;
+        const projY = this.y + this.height/2 - 3;
+        monsterProjectiles.push(new MonsterProjectile(projX, projY, projDir));
+        console.log(`Monster Craft at x=${this.x}, y=${this.y} fired projectile at x=${projX}, y=${projY}, direction=${projDir}`);
+        this.lastShotTime = now;
+        this.shootCooldown = 3000 + Math.random() * 2000 - currentLevel * 50; // Reset with longer cooldown
+    }
+    if (checkCollision(this, player) && currentGameState === GAME_STATE.PLAYING) {
+        this.alive = false;
+        console.log("Monster Craft destroyed by player collision at x=", this.x);
+        handlePlayerDeath("Crashed by UFO!");
+    }
+
+    // Avoid other monster crafts
+    monsterCrafts.forEach(other => {
+        if (other !== this && other.alive) {
+            const dx = this.x - other.x;
+            const dy = this.y - other.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < 100) { // Minimum spacing
+                this.x += (dx / distance) * 2;
+                this.y += (dy / distance) * 1;
+            }
+        }
+    });
+};
+
+            this.draw = function() {
+                if (!this.alive) return;
+                ctx.save();
+                // UFO metallic oval body
+                ctx.beginPath();
+                ctx.ellipse(this.x + this.width/2, this.y + this.height/2, this.width/2, this.height/2, 0, 0, Math.PI*2);
+                ctx.fillStyle = this.color;
+                ctx.shadowColor = '#b0c4de';
+                ctx.shadowBlur = 6; // Reduced shadow blur
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                // Dome/cockpit
+                ctx.beginPath();
+                ctx.ellipse(this.x + this.width/2, this.y + this.height/2 - 3, this.width/4, this.height/2.5, 0, 0, Math.PI*2);
+                ctx.fillStyle = this.domeColor;
+                ctx.fill();
+                // Glowing lights (2 small circles instead of 3)
+                for (let i = -1; i <= 1; i += 2) {
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.width/2 + i*7, this.y + this.height - 3, 2, 0, Math.PI*2);
+                    ctx.fillStyle = this.lightColor;
+                    ctx.shadowColor = this.lightColor;
+                    ctx.shadowBlur = 4;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+                ctx.restore();
+            };
+        }
+
+        // MonsterCraft projectile
+        function MonsterProjectile(x, y, direction) {
+            this.x = x;
+            this.y = y;
+            this.width = 6;  // Reduced from 8
+            this.height = 3; // Reduced from 4
+            this.color = '#00ffcc';
+            this.speed = 6 + currentLevel * 0.3;
+            this.direction = direction;
+            this.update = function() {
+                this.x += this.speed * this.direction * gameSpeedFactor;
+            };
+            this.draw = function() {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+            };
+        }
+        
+        // --- Wooden Direction Signs ---
+        let earthSigns = [];
+        function placeEarthSigns() {
+            earthSigns = [];
+            // Place only 1 sign per level
+            if (!terrain || terrain.length < 2) return;
+            const idx = 1 + Math.floor(Math.random() * (terrain.length - 2));
+            const t = terrain[idx];
+            // Randomly choose label and direction
+            let label, direction;
+            if (Math.random() < 0.5) {
+                label = 'Earth';
+                direction = Math.random() > 0.5 ? 1 : -1;
+            } else {
+                label = 'Mars';
+                direction = 1; // Mars always points right
+            }
+            earthSigns.push({ x: t.x, y: t.y, dir: direction, label });
+        }
+        
+        // --- Initialize Game ---
+        initGame();
+
+        // Add SpaceMine class and related code
+        let spaceMines = [];
+
+        function SpaceMine(x, y) {
+            this.x = x;
+            this.y = y;
+            this.width = 20;
+            this.height = 20;
+            this.active = true;
+            this.explosionRadius = 0;
+            this.explosionAlpha = 1;
+            this.isExploding = false;
+            
+            this.draw = function() {
+                if (this.active && !this.isExploding) {
+                    // Draw mine box
+                    ctx.save();
+                    ctx.fillStyle = '#ff3333';
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                    
+                    // Warning stripes
+                    ctx.fillStyle = '#ffff00';
+                    ctx.fillRect(this.x + 2, this.y + 2, this.width - 4, 4);
+                    ctx.fillRect(this.x + 2, this.y + this.height - 6, this.width - 4, 4);
+                    
+                    // Blinking light
+                    const blinkRate = Date.now() / 500;
+                    if (Math.sin(blinkRate) > 0) {
+                        ctx.fillStyle = '#ff0000';
+                        ctx.beginPath();
+                        ctx.arc(this.x + this.width/2, this.y + this.height/2, 3, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    ctx.restore();
+                } else if (this.isExploding) {
+                    // Draw explosion
+                    ctx.save();
+                    ctx.globalAlpha = this.explosionAlpha;
+                    const gradient = ctx.createRadialGradient(
+                        this.x + this.width/2, this.y + this.height/2, 0,
+                        this.x + this.width/2, this.y + this.height/2, this.explosionRadius
+                    );
+                    gradient.addColorStop(0, 'rgba(255, 200, 50, 1)');
+                    gradient.addColorStop(0.5, 'rgba(255, 100, 50, 0.8)');
+                    gradient.addColorStop(1, 'rgba(255, 50, 50, 0)');
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.width/2, this.y + this.height/2, this.explosionRadius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                    
+                    // Update explosion
+                    this.explosionRadius += 2;
+                    this.explosionAlpha -= 0.05;
+                    if (this.explosionAlpha <= 0) {
+                        this.active = false;
+                    }
+                }
+            };
+            
+            this.explode = function() {
+                if (!this.isExploding) {
+                    this.isExploding = true;
+                    this.explosionRadius = 10;
+                    this.explosionAlpha = 1;
+                }
+            };
+        }
+    </script>
+</body>
+</html>
